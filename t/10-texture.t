@@ -5,10 +5,12 @@ use FindBin;
 use Test::More;
 use OpenGL qw( glGetError );
 use X11::GLX::DWIM;
-my $glx= X11::GLX::DWIM->new(window => 1);
-$glx->begin_frame;
 
 use_ok( 'OpenGL::Sandbox::Texture' ) or BAIL_OUT;
+
+my $glx= X11::GLX::DWIM->new(window => 1);
+note 'GL Version '.$glx->glx_version;
+$glx->target($glx->create_render_pixmap({ width => 100, height => 100 }));
 
 # Create tmp dir for this script
 my $tmp= "$FindBin::Bin/tmp/$FindBin::Script";
