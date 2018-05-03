@@ -77,32 +77,33 @@ store_fail:
 	croak("Can't store results in supplied hash");
 }
 
-void _load_rgb_rect_rescale(HV *self, int width, int height, int has_alpha, SV *mmap) {
-	struct SwsContext *sws= NULL;
-	SV *sv= NULL;
-	void *data= SCALAR_REF_DATA_OR_CROAK(mmap);
-	int len= SCALAR_REF_LEN(mmap);
-	int gl_fmt= has_alpha? GL_RGBA : GL_RGB;
-	int px_size= has_alpha? 4 : 3;
-	int dim;
-	const uint8_t *src_planes[4]= { data,0,0,0 };
-	int src_stride[4]= { width*px_size,0,0,0 };
-	uint8_t *dst_planes[4]= { 0,0,0,0 };
-	int dst_stride[4]= { 0,0,0,0 };
-	
-	if (width * height * px_size != len)
-		croak("Size of scalar ref disagrees with rectangle dimensions: %d * %d * %d != %d",
-			width, height, px_size, len);
-	
-	/* calculate next power of two */
-	dim= (width > height? width : height) - 1;
+int _round_up_pow2(long dim) {
+	--dim;
+	dim |= dim >> 32;
 	dim |= dim >> 16;
 	dim |= dim >> 8;
 	dim |= dim >> 4;
 	dim |= dim >> 2;
 	dim |= dim >> 1;
-	dim++;
-	dst_stride[0]= dim * px_size;
+	return ++dim;
+}
+
+SV* _rescale_to_pow2_square(int width, int height, int has_alpha, SV *sref) {
+	struct SwsContext *sws= NULL;
+	SV *ret= NULL;
+	void *data= SCALAR_REF_DATA_OR_CROAK(sref);
+	int len= SCALAR_REF_LEN(sref);
+	int gl_fmt= has_alpha? GL_RGBA : GL_RGB;
+	int px_size= has_alpha? 4 : 3;
+	int dim= _round_up_pow2(width > height? width : height);
+	const uint8_t *src_planes[4]= { data,0,0,0 };
+	int src_stride[4]= { width*px_size,0,0,0 };
+	uint8_t *dst_planes[4]= { 0,0,0,0 };
+	int dst_stride[4]= { dim*px_size,0,0,0 };
+	
+	if (width * height * px_size != len)
+		croak("Size of scalar ref disagrees with rectangle dimensions: %d * %d * %d != %d",
+			width, height, px_size, len);
 	
 	/* rescale to square */
 	sws= sws_getCachedContext(sws, width, height, has_alpha? PIX_FMT_RGBA : PIX_FMT_RGB24,
@@ -110,21 +111,18 @@ void _load_rgb_rect_rescale(HV *self, int width, int height, int has_alpha, SV *
 		SWS_BICUBIC, NULL, NULL, NULL);
 	if (!sws)
 		croak("can't initialize resize context");
-	Newx(dst_planes[0], dim*dim*px_size, uint8_t); // allocate dest buffer
-	SAVEFREEPV(dst_planes[0]); /* auto mem cleanup */
+	
+	/* allocate a "mortal" scalar into which we write the new image */
+	ret= sv_2mortal(newSV(dim*dim*px_size));
+	sv_setpvn(ret, "", 0);
+	SvGROW(ret, dim*dim*px_size);
+	SvCUR_set(ret, dim*dim*px_size);
+	dst_planes[0]= SvPVX(ret);
+	
+	/* perform the rescale */
 	sws_scale(sws, src_planes, src_stride, 0, height, dst_planes, dst_stride);
 	sws_freeContext(sws);
 	
-	/* Bind texture, and load image data */
-	glBindTexture(GL_TEXTURE_2D, _lazy_build_tx_id(self));
-	glTexImage2D(GL_TEXTURE_2D, 0, gl_fmt, dim, dim, 0, gl_fmt, GL_UNSIGNED_BYTE, dst_planes[0]);
-
-	/* update attributes */
-	if (!hv_store(self, "width",  5, sv=newSViv(dim), 0)) goto store_fail;
-	if (!hv_store(self, "height", 6, sv=newSViv(dim), 0)) goto store_fail;
-	if (!hv_store(self, "has_alpha", 9, sv=newSViv(has_alpha? 1 : 0), 0)) goto store_fail;
-	return;
-store_fail:
-	if (sv) sv_2mortal(sv);
-	croak("Can't store results in supplied hash");
+	/* return a ref to the scalar, to avoid making a copy */
+	return newRV_inc(ret);
 }

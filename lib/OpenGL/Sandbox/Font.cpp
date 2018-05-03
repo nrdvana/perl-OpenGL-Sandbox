@@ -10,7 +10,7 @@ public:
 	 */
 	TextureFont(SV *mmap):
 		mmap_obj(mmap),
-		FTTextureFont((const unsigned char*)MMAP_OBJ_PTR_OR_CROAK(mmap), MMAP_OBJ_LEN(mmap))
+		FTTextureFont((const unsigned char*)SCALAR_REF_DATA_OR_CROAK(mmap), SCALAR_REF_LEN(mmap))
 	{
 		SvREFCNT_inc_void_NN(mmap_obj);
 	}
