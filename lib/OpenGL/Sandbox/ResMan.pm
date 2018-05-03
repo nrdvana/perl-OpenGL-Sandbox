@@ -166,10 +166,10 @@ sub load_fontdata {
 	# resolve filename to device and inode ID, which might already be mapped
 	my ($dev, $ino)= stat $fname
 		or croak "No such font file '$name'";
-	unless ($mmap= $self->_fontdata_cache->{"$dev,$ino"}) {
+	unless ($mmap= $self->_fontdata_cache->{"~$dev,$ino"}) {
 		# If it wasn't, map it and also weaken the reference
 		$mmap= OpenGL::Sandbox::MMap->new($fname);
-		weaken( $self->_fontdata_cache->{"$dev,$ino"}= $mmap );
+		weaken( $self->_fontdata_cache->{"~$dev,$ino"}= $mmap );
 	}
 	# Then cache that reference for this name, but also a weak reference
 	weaken( $self->_fontdata_cache->{$name}= $mmap );
@@ -196,10 +196,13 @@ sub tex {
 
   my $tex= $res->load_texture( $name, %options )
 
-Load a texture by name.  If the texture doesn't exist in "tex/" but a matching
-filename exists in "img/", then create the texture from that image first.
+Load a texture by name.  It searches for known file extensions in the C<$resource_dir/tex/>
+directory and can resolve symlinks so it only loads a texture once even if it
+has multiple names.
 
-Dies if the texture and image are missing, or if it wasn't able to process them.
+If a new texture object is created, it is initialized with C<%options>.
+
+Dies if no matching file can be found, or if it wasn't able to process it.
 
 =cut
 
@@ -209,38 +212,18 @@ sub load_texture {
 	return $tex if $tex= $self->_texture_cache->{$name};
 	
 	$log->debug("loading texture $name");
-	my $fname= File::Spec->rel2abs( $name.'.tex', $self->resource_root_dir.'/tex' );
-	# resolve filename to device and inode ID, which might already be mapped
-	unless (-e $fname) {
-		# It doesn't exist.  Check for an image
-		my $base= $self->resource_root_dir;
-		my ($srcfile)= sort { $a =~ /png$/? -1 : $b =~ /png$/? 1 : $a cmp $b } <$base/img/$name.*>;
-			if ($srcfile && (!-f $file || (stat $srcfile)[9] > (stat $file)[9])) {
-				# For debugging, auto-convert from source image to dest bitmap
-				$log->notice("convert $srcfile -> $file");
-				system("$FindBin::Bin/img2tex.pl", $srcfile, $file) == 0
-					or croak "convert failed";
-			}
-			-e $file and -e ($file= Cwd::abs_path($file)) or croak "No such file '$file'";
-			$self->load_image($file);
-		};
-	};
-}
-
-# This is currently the only type of texture we will load.
-# By memory-mapping OpenGL-native data, we can then mmap it straight
-# into the graphics driver without a copy.
-sub _load_native_gl_tex {
-	my ($self, $filename)= @_;
-	my $mmap= MMap->new(file => $filename);
-	croak "texture file truncated" if $mmap->length < 8;
-	# Our texture format puts a 32bit width and height at the end of the image
-	my ($width, $height)= unpack('VV', $mmap->substr(-8,8));
-	croak "image dimensions don't match file size ($width*$height*4+8 != ".$mmap->length.")"
-		unless $width * $height * 4 + 8 == $mmap->length;
-	my $img= OpenGL::MinRes::Image->new();
-	$img->load_gl_native($width, $height, 1, $mmap);
-	$img;
+	my ($fname)= grep { -e $_ } map {
+			File::Spec->rel2abs( $name.$_, $self->resource_root_dir.'/tex' )
+		} qw( .rgb .rgba .png ), '';
+	$fname or croak "No such texture '$name'";
+	my ($dev, $ino)= stat $fname
+		or croak "stat($fname): $!";
+	return $tex if $tex= $self->_texture_cache->{"~$dev,$ino"};
+	
+	$tex= OpenGL::Sandbox::Texture->new(\%options)->load($fname);
+	$self->_texture_cache->{"~$dev,$ino"}= $tex;
+	$self->_texture_cache->{$name}= $tex;
+	return $tex;
 }
 
 1;
