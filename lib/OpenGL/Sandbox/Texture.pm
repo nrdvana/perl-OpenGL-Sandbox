@@ -19,21 +19,27 @@ Width of texture, in texels
 
 Height of texture, in texels.  Currently will always equal width.
 
-=head2 mipmaps
-
-undef, or arrayref describing mipmap levels for the texture.
-
 =head2 has_alpha
 
 Boolean of whether the texture contains an alpha channel.
 
+=head2 mipmap
+
+Boolean, whether texture has (or should have) mipmaps generated for it.
+When loading any "simple" image format, this setting controls whether
+mipmaps will be automatically generated.
+
 =cut
 
-has tx_id     => ( is => 'lazy' );
-has width     => ( is => 'rwp' );
-has height    => ( is => 'rwp' );
-has mipmaps   => ( is => 'rwp' );
-has has_alpha => ( is => 'rwp' );
+has tx_id      => ( is => 'lazy' );
+has width      => ( is => 'rwp' );
+has height     => ( is => 'rwp' );
+has has_alpha  => ( is => 'rwp' );
+has mipmap     => ( is => 'rwp' );
+has min_filter => ( is => 'rwp' );
+has mag_filter => ( is => 'rwp' );
+has wrap_s     => ( is => 'rwp' );
+has wrap_t     => ( is => 'rwp' );
 
 =head1 METHODS
 
@@ -127,6 +133,17 @@ sub _load_png_data_and_rescale {
 		unless $width == $height && $width == _round_up_pow2($width);
 	return $dataref;
 }
+
+=head2 bind
+
+  $tex->bind( $target=GL_TEXTURE_2D )
+
+Make this image the current texture for OpenGL's C<$target>, with the default
+of GL_TEXTURE_2D.
+
+=cut
+
+*bind= *_bind_tx; # in C, conflicts with sockets function, so have to rename from perl
 
 =head1 CLASS FUNCTIONS
 

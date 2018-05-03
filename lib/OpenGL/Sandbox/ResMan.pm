@@ -214,7 +214,7 @@ sub load_texture {
 	$log->debug("loading texture $name");
 	my ($fname)= grep { -e $_ } map {
 			File::Spec->rel2abs( $name.$_, $self->resource_root_dir.'/tex' )
-		} qw( .rgb .rgba .png ), '';
+		} qw( .rgb .png ), '';
 	$fname or croak "No such texture '$name'";
 	my ($dev, $ino)= stat $fname
 		or croak "stat($fname): $!";

@@ -3,6 +3,10 @@ use strict;
 use warnings;
 use FindBin;
 use Test::More;
+use OpenGL qw( glGetError );
+use X11::GLX::DWIM;
+my $glx= X11::GLX::DWIM->new(window => 1);
+$glx->begin_frame;
 
 use_ok( 'OpenGL::Sandbox::Texture' ) or BAIL_OUT;
 
@@ -26,8 +30,9 @@ subtest load_rgb => sub {
 				my $tx= OpenGL::Sandbox::Texture->new->load($fname);
 				is( $tx->width, $dim, "width=$dim" );
 				is( $tx->height, $dim, "height=$dim" );
-				is( $tx->mipmaps, undef, "no mipmaps" );
+				ok( !$tx->mipmap, "no mipmaps" );
 				is( !!$tx->has_alpha, !!$alpha, "has_alpha=$alpha" );
+				is( glGetError(), 0, 'no GL error' );
 			}
 		};
 	}
@@ -49,6 +54,7 @@ subtest load_png => sub {
 			OpenGL::Sandbox::Texture::convert_png("$datadir/$fname", "$tmp/$fname.rgb");
 			my $tx2= OpenGL::Sandbox::Texture->new->load("$tmp/$fname.rgb");
 			is( $tx2->width, $tx->width );
+			is( glGetError(), 0, 'no GL error' );
 		};
 	}
 };
