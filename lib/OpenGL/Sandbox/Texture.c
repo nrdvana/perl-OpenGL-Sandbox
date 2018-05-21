@@ -60,7 +60,7 @@ SV *_fetch_if_defined(HV *self, const char *field, int len) {
 	return (field_p && *field_p && SvOK(*field_p)) ? *field_p : NULL;
 }
 
-void _load_rgb_square(HV *self, SV *mmap) {
+void _load_rgb_square(HV *self, SV *mmap, int is_bgr) {
 	SV *sv;
 	void *data= SCALAR_REF_DATA_OR_CROAK(mmap);
 	const char *ver;
@@ -73,7 +73,9 @@ void _load_rgb_square(HV *self, SV *mmap) {
 	int len= SCALAR_REF_LEN(mmap);
 	int has_alpha= 0;
 	int dim= _dimension_from_filesize(len, &has_alpha);
-	int gl_fmt= has_alpha? GL_RGBA : GL_RGB;
+	int gl_fmt= is_bgr? ( has_alpha? GL_BGRA : GL_BGR )
+	                  : ( has_alpha? GL_RGBA : GL_RGB );
+	int gl_internal_fmt= has_alpha? GL_RGBA : GL_RGB;
 	
 	/* use mipmaps if the user set it to true, or if the min_filter uses a mipmap,
 	   and default in absence of any user prefs is true. */
@@ -110,7 +112,7 @@ void _load_rgb_square(HV *self, SV *mmap) {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
 	}
-	glTexImage2D(GL_TEXTURE_2D, 0, gl_fmt, dim, dim, 0, gl_fmt, GL_UNSIGNED_BYTE, data);
+	glTexImage2D(GL_TEXTURE_2D, 0, gl_internal_fmt, dim, dim, 0, gl_fmt, GL_UNSIGNED_BYTE, data);
 	if (with_mipmaps && major >= 3) {
 		glGenerateMipmap(GL_TEXTURE_2D);
 		/* examples show setting these after mipmap generation.  Does it matter? */
@@ -145,7 +147,7 @@ int _round_up_pow2(long dim) {
 	return ++dim;
 }
 
-SV* _rescale_to_pow2_square(int width, int height, int has_alpha, SV *sref) {
+SV* _rescale_to_pow2_square(int width, int height, int has_alpha, int want_bgr, SV *sref) {
 	struct SwsContext *sws= NULL;
 	SV *ret= NULL;
 	void *data= SCALAR_REF_DATA_OR_CROAK(sref);
@@ -163,7 +165,7 @@ SV* _rescale_to_pow2_square(int width, int height, int has_alpha, SV *sref) {
 	
 	/* rescale to square */
 	sws= sws_getCachedContext(sws, width, height, has_alpha? PIX_FMT_RGBA : PIX_FMT_RGB24,
-		dim, dim, has_alpha? PIX_FMT_RGBA : PIX_FMT_RGB24,
+		dim, dim, want_bgr? (has_alpha? PIX_FMT_BGRA : PIX_FMT_BGR24) : (has_alpha? PIX_FMT_RGBA : PIX_FMT_RGB24),
 		SWS_BICUBIC, NULL, NULL, NULL);
 	if (!sws)
 		croak("can't initialize resize context");

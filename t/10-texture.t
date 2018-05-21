@@ -3,7 +3,6 @@ use strict;
 use warnings;
 use FindBin;
 use Test::More;
-use OpenGL qw( glGetError );
 use X11::GLX::DWIM;
 
 use_ok( 'OpenGL::Sandbox::Texture' ) or BAIL_OUT;
@@ -24,7 +23,7 @@ subtest load_rgb => sub {
 		subtest "dim=$dim" => sub {
 			for my $alpha (0, 1) {
 				# Write out RGBA texture
-				my $fname= "$tmp/$dim.".($alpha? 'rgba':'rgb');
+				my $fname= "$tmp/$dim-$alpha.rgb";
 				open my $img1, '>', $fname or die "open($fname): $!";
 				print $img1 chr(0x7F) x ($dim * $dim * ($alpha?4:3)) or die "print: $!";
 				close $img1 or die "close: $!";
@@ -34,7 +33,7 @@ subtest load_rgb => sub {
 				is( $tx->height, $dim, "height=$dim" );
 				ok( !$tx->mipmap, "no mipmaps" );
 				is( !!$tx->has_alpha, !!$alpha, "has_alpha=$alpha" );
-				is( glGetError(), 0, 'no GL error' );
+				is_deeply( $glx->get_gl_errors//{}, {}, 'no GL error' );
 			}
 		};
 	}
@@ -48,15 +47,15 @@ subtest load_png => sub {
 	for (@tests) {
 		my ($fname, $width, $height, $has_alpha)= @$_;
 		subtest $fname => sub {
-			my $tx= OpenGL::Sandbox::Texture->new->load("$datadir/$fname");
-			is( $tx->width, $width );
-			is( $tx->height, $height );
-			is( $tx->has_alpha, $has_alpha );
+			my $tx= OpenGL::Sandbox::Texture->new->load("$datadir/tex/$fname");
+			is( $tx->width, $width, 'width' );
+			is( $tx->height, $height, 'height' );
+			is( $tx->has_alpha, $has_alpha, 'alpha' );
 			
-			OpenGL::Sandbox::Texture::convert_png("$datadir/$fname", "$tmp/$fname.rgb");
+			OpenGL::Sandbox::Texture::convert_png("$datadir/tex/$fname", "$tmp/$fname.rgb");
 			my $tx2= OpenGL::Sandbox::Texture->new->load("$tmp/$fname.rgb");
-			is( $tx2->width, $tx->width );
-			is( glGetError(), 0, 'no GL error' );
+			is( $tx2->width, $tx->width, 'width after convert to rgb' );
+			is_deeply( $glx->get_gl_errors//{}, {}, 'no GL error' );
 		};
 	}
 };

@@ -72,19 +72,24 @@ dimensions and presence of alpha channel are derived mathematically from the
 file size.  The data is directly mmap'd so no copying is performed before
 handing the pointer to OpenGL.
 
-=head2 load_rgba
+=head2 load_bgr
 
-Alias for load_rgb, since it can handle both RGB and RGBA.
+Same as rgb, except the source data has the red and blue bytes swapped.
 
 =cut
 
 sub load_rgb {
 	my ($self, $fname)= @_;
 	my $mmap= OpenGL::Sandbox::MMap->new($fname);
-	$self->_load_rgb_square($mmap);
+	$self->_load_rgb_square($mmap, 0);
 	return $self;
 }
-*load_rgba= *load_rgb;
+sub load_bgr {
+	my ($self, $fname)= @_;
+	my $mmap= OpenGL::Sandbox::MMap->new($fname);
+	$self->_load_rgb_square($mmap, 1);
+	return $self;
+}
 
 =head2 load_png
 
@@ -100,12 +105,13 @@ coordinates.
 
 sub load_png {
 	my ($self, $fname)= @_;
-	$self->_load_rgb_square(_load_png_data_and_rescale($fname));
+	my $use_bgr= 1; # TODO: check OpenGL for optimal format
+	$self->_load_rgb_square(_load_png_data_and_rescale($fname, $use_bgr), $use_bgr);
 	return $self;
 }
 
 sub _load_png_data_and_rescale {
-	my $fname= shift;
+	my ($fname, $use_bgr)= @_;
 	require Image::PNG::Libpng;
 	
 	# Load PNG format, or die
@@ -129,7 +135,7 @@ sub _load_png_data_and_rescale {
 	length($$dataref) == ($has_alpha? 4 : 3) * $width * $height
 		or croak sprintf "$fname does not contain the expected number of data bytes (%d != %d * %d * %d)",
 			length($$dataref), $has_alpha? 4:3, $width, $height;
-	$dataref= _rescale_to_pow2_square($width, $height, $has_alpha, $dataref)
+	$dataref= _rescale_to_pow2_square($width, $height, $has_alpha, $use_bgr? 1 : 0, $dataref)
 		unless $width == $height && $width == _round_up_pow2($width);
 	return $dataref;
 }
@@ -158,7 +164,8 @@ power of 2 if it is not already.  The pixel format of the PNG must be RGB or RGB
 
 sub convert_png {
 	my ($src, $dst)= @_;
-	my $dataref= _load_png_data_and_rescale($src);
+	my $use_bgr= $dst =~ /bgr$/? 1 : 0;
+	my $dataref= _load_png_data_and_rescale($src, $use_bgr);
 	open my $dst_fh, '>', $dst or croak "open($dst): $!";
 	binmode $dst_fh;
 	print $dst_fh $$dataref;
