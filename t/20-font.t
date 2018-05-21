@@ -1,13 +1,13 @@
 #! /usr/bin/env perl
 use strict;
 use warnings;
+use FindBin;
 use Test::More;
 
 use_ok( 'OpenGL::Sandbox::Font' ) or BAIL_OUT;
 
-chomp(my $ttf= `find /usr/share -name '*.ttf' | head -n 1`);
--f $ttf or die "Can't find a font to test with in /usr/share";
-my $mmap= OpenGL::Sandbox::MMap->new($ttf);
+my $mmap= OpenGL::Sandbox::MMap->new("$FindBin::Bin/data/font/Empty.ttf");
 my $font= new_ok( 'OpenGL::Sandbox::Font::TextureFont', [ $mmap ], '$font' );
+is( $font->ascender, 0, 'font has zero dimension character' );
 
 done_testing;

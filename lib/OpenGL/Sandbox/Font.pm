@@ -9,7 +9,7 @@ use Inline CPP => do { my $x= __FILE__; $x =~ s/\.pm$/\.cpp/; $x },
 	       .do{ my $x= __FILE__; $x =~ s|/[^/]+$||; Cwd::abs_path($x) },
 	LIBS => '-lfreetype -lftgl';
 
-push @OpenGL::Sandbox::Font::TextureFont, __PACKAGE__;
+push @OpenGL::Sandbox::Font::TextureFont::ISA, __PACKAGE__;
 
 our %h_align_map= ( left => 1, center => 2, right => 3 );
 our %v_align_map= ( top => 4, center => 3, base => 2, bottom => 1 );
