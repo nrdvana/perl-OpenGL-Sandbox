@@ -20,11 +20,23 @@ public:
 
 	/* I'd prefer to export the methods of the parent class directly, but
 	 * can't figure out a way to get Inline::CPP to process the classes
-	 * from the FTGL heders.
+	 * from the FTGL heders.  Also, some methods are overloaded.
 	 * So, just re-publish them with perl-friendly names.
 	 */
-	double ascender() { return Ascender(); }
-	double descender() { return Descender(); }
+	double ascender()     { return Ascender(); }
+	double descender()    { return Descender(); }
+	double line_height()  { return LineHeight(); }
+	int    face_size(...) {
+		Inline_Stack_Vars;
+		int pt, res;
+		if (Inline_Stack_Items > 0) {
+			pt= SvIV(Inline_Stack_Item(0));
+			res= Inline_Stack_Items > 1? SvIV(Inline_Stack_Item(1)) : 72;
+			if (!FaceSize(pt, res)) croak("invalid size");
+		}
+		return FaceSize();
+	}
+
 	double advance(const char *text) { return Advance(text, -1); }
 	
 	void render_text(const char *text, int h_align, int v_align, double monospace) {
