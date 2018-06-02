@@ -7,9 +7,22 @@ use OpenGL::Sandbox::MMap;
 
 =head1 ATTRIBUTES
 
+=head2 filename
+
+Path from which image data will be loaded.  If not set, the texture will not have any default
+image data loaded.
+
+=head2 loader
+
+A method name or coderef of your choice for lazy-loading the image data.  If not set, the
+loader is determined from the L</filename> and if that is not set, nothing gets loaded on
+creation of the texture id L<tx_id>.
+
+Gets executed as C<< $tex->$loader($filename) >>.
+
 =head2 tx_id
 
-Lazy-built OpenGL texture ID (integer)
+Lazy-built OpenGL texture ID (integer).  Triggers L</load> if image is not yet loaded.
 
 =head2 width
 
@@ -31,7 +44,10 @@ mipmaps will be automatically generated.
 
 =cut
 
-has tx_id      => ( is => 'lazy' );
+has filename   => ( is => 'rw' );
+has loader     => ( is => 'rw' );
+has loaded     => ( is => 'rw' );
+has tx_id      => ( is => 'rw', lazy => 1, builder => 1 );
 has width      => ( is => 'rwp' );
 has height     => ( is => 'rwp' );
 has has_alpha  => ( is => 'rwp' );
@@ -43,25 +59,54 @@ has wrap_t     => ( is => 'rwp' );
 
 =head1 METHODS
 
+=head2 bind
+
+  $tex->bind( $target=GL_TEXTURE_2D )
+
+Make this image the current texture for OpenGL's C<$target>, with the default of
+C<GL_TEXTURE_2D>.  If L</tx_id> does not exist yet, it gets created.  If this texture has
+a L</loader> or L</filename> defined and has not yet been L</loaded>, this automatically
+calls L</load>.
+
+Returns C<$self> for convenient chaining.
+
+=cut
+
+sub bind {
+	my ($self, $target)= @_;
+	OpenGL::glBindTexture($self->tx_id, $target // OpenGL::GL_TEXTURE_2D);
+	if (!$self->loaded && (defined $self->loader || defined $self->filename)) {
+		$self->load;
+	}
+	$self;
+}
+
 =head2 load
 
-  $tex->load($fname);
+  $tex->load;
 
-Load image data from a file into OpenGL, and auto-detect the type based on file name.
+Load image data from a file into OpenGL.  This does not happen when the object is first
+constructed, in case the OpenGL context hasn't been initialized yet.  It automatically happens
+when L</bind> is called for the first time.
 
-Each file extension is handed off to a matching "load_${ext}" method. 
+Calls C<< $self->loader->($self, $self->filename) >>.  L</tx_id> will be a valid texture id
+after this (assuming the loader doesn't die).
+
+Returns C<$self> for convenient chaining.
 
 =cut
 
 sub load {
 	my ($self, $fname)= @_;
-	my ($extension)= ($fname =~ /\.(\w+)$/)
-		or croak "No file extension: \"$fname\"";
-	my $loader= "load_$extension";
-	$self->can($loader)
-		or croak "Can't load file of type $extension";
+	$fname //= $self->filename;
+	my $loader= $self->loader // do {
+		my ($extension)= ($fname =~ /\.(\w+)$/)
+			or croak "No file extension: \"$fname\"";
+		my $method= "load_$extension";
+		$self->can($method)
+			or croak "Can't load file of type $extension";
+	};
 	$self->$loader($fname);
-	return $self;
 }
 
 =head2 load_rgb
@@ -82,12 +127,14 @@ sub load_rgb {
 	my ($self, $fname)= @_;
 	my $mmap= OpenGL::Sandbox::MMap->new($fname);
 	$self->_load_rgb_square($mmap, 0);
+	$self->loaded(1);
 	return $self;
 }
 sub load_bgr {
 	my ($self, $fname)= @_;
 	my $mmap= OpenGL::Sandbox::MMap->new($fname);
 	$self->_load_rgb_square($mmap, 1);
+	$self->loaded(1);
 	return $self;
 }
 
@@ -99,7 +146,7 @@ gets stretched out to the next power of two square, using libswscale.
 
 This library currently has no provision for the OpenGL "rectangular texture"
 extension that allows for actual rectangular images and positive integer texture
-coordinates.
+coordinates.  That could be a useful addition.
 
 =cut
 
@@ -107,6 +154,7 @@ sub load_png {
 	my ($self, $fname)= @_;
 	my $use_bgr= 1; # TODO: check OpenGL for optimal format
 	$self->_load_rgb_square(_load_png_data_and_rescale($fname, $use_bgr), $use_bgr);
+	$self->loaded(1);
 	return $self;
 }
 
@@ -140,16 +188,10 @@ sub _load_png_data_and_rescale {
 	return $dataref;
 }
 
-=head2 bind
+=head2 TODO: load_ktx
 
-  $tex->bind( $target=GL_TEXTURE_2D )
-
-Make this image the current texture for OpenGL's C<$target>, with the default
-of GL_TEXTURE_2D.
-
-=cut
-
-*bind= *_bind_tx; # in C, conflicts with sockets function, so have to rename from perl
+OpenGL has its own image file format designed to directly handle all the various things you
+might want to load into a texture.  Integrating libktx is on my list.
 
 =head1 CLASS FUNCTIONS
 
@@ -157,14 +199,15 @@ of GL_TEXTURE_2D.
 
   convert_png("foo.png", "foo.rgb");
 
-Read a .png file and write an .rgb file.  The .png will be scaled to a square
-power of 2 if it is not already.  The pixel format of the PNG must be RGB or RGBA.
+Read a C<.png> file and write an C<.rgb> (or C<.bgr>) file.  The C<.png> will be scaled to a
+square power of 2 if it is not already.  The pixel format of the PNG must be C<RGB> or C<RGBA>.
+This does not require an OpenGL context.
 
 =cut
 
 sub convert_png {
 	my ($src, $dst)= @_;
-	my $use_bgr= $dst =~ /bgr$/? 1 : 0;
+	my $use_bgr= $dst =~ /\.bgr$/? 1 : 0;
 	my $dataref= _load_png_data_and_rescale($src, $use_bgr);
 	open my $dst_fh, '>', $dst or croak "open($dst): $!";
 	binmode $dst_fh;
@@ -176,7 +219,7 @@ sub convert_png {
 use Inline
 	C => do { my $x= __FILE__; $x =~ s|\.pm|\.c|; Cwd::abs_path($x) },
 	INC => '-I'.do{ my $x= __FILE__; $x =~ s|/[^/]+$|/|; Cwd::abs_path($x) }.' -I/usr/include/ffmpeg',
-	LIBS => '-lGL -lswscale -X11',
+	LIBS => '-lGL -lswscale',
 	CCFLAGSEX => '-Wall -g3 -Os';
 
 1;

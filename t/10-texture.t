@@ -28,7 +28,7 @@ subtest load_rgb => sub {
 				print $img1 chr(0x7F) x ($dim * $dim * ($alpha?4:3)) or die "print: $!";
 				close $img1 or die "close: $!";
 				# Load it as a texture
-				my $tx= OpenGL::Sandbox::Texture->new->load($fname);
+				my $tx= OpenGL::Sandbox::Texture->new(filename => $fname)->load;
 				is( $tx->width, $dim, "width=$dim" );
 				is( $tx->height, $dim, "height=$dim" );
 				ok( !$tx->mipmap, "no mipmaps" );
@@ -47,13 +47,13 @@ subtest load_png => sub {
 	for (@tests) {
 		my ($fname, $width, $height, $has_alpha)= @$_;
 		subtest $fname => sub {
-			my $tx= OpenGL::Sandbox::Texture->new->load("$datadir/tex/$fname");
+			my $tx= OpenGL::Sandbox::Texture->new(filename => "$datadir/tex/$fname")->load;
 			is( $tx->width, $width, 'width' );
 			is( $tx->height, $height, 'height' );
 			is( $tx->has_alpha, $has_alpha, 'alpha' );
 			
 			OpenGL::Sandbox::Texture::convert_png("$datadir/tex/$fname", "$tmp/$fname.rgb");
-			my $tx2= OpenGL::Sandbox::Texture->new->load("$tmp/$fname.rgb");
+			my $tx2= OpenGL::Sandbox::Texture->new(filename => "$tmp/$fname.rgb")->load;
 			is( $tx2->width, $tx->width, 'width after convert to rgb' );
 			is_deeply( $glx->get_gl_errors//{}, {}, 'no GL error' );
 		};

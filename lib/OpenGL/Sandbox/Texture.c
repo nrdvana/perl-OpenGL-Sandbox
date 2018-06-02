@@ -10,7 +10,8 @@ int _build_tx_id(HV *self) {
 	glGenTextures(1, &tx_id);
 	return tx_id;
 }
-/* This is our shortcut to bypass Moo from C */
+/* This is our shortcut to bypass Moo from C.  The more correct thing to do would be set up a call
+ * stack and call $self->_build_tx_id in case someone overrode it in a subclass. */
 int _lazy_build_tx_id(HV *self) {
 	SV **field_p= hv_fetch(self, "tx_id", 5, 1);
 	GLuint tx_id;
