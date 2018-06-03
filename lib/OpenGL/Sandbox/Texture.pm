@@ -62,6 +62,10 @@ Boolean, whether texture has (or should have) mipmaps generated for it.
 When loading any "simple" image format, this setting controls whether
 mipmaps will be automatically generated.
 
+=head2 min_filter
+
+Initialize this during object construction
+
 =cut
 
 has filename   => ( is => 'rw' );
@@ -69,16 +73,25 @@ has loader     => ( is => 'rw' );
 has loaded     => ( is => 'rw' );
 has src_width  => ( is => 'rw' );
 has src_height => ( is => 'rw' );
-has tx_id      => ( is => 'rw', lazy => 1, builder => 1 );
+has tx_id      => ( is => 'rw', lazy => 1, builder => 1, predicate => 1 );
 has width      => ( is => 'rwp' );
 has height     => ( is => 'rwp' );
 has pow2_size  => ( is => 'rw' );
 has has_alpha  => ( is => 'rwp' );
 has mipmap     => ( is => 'rwp' );
-has min_filter => ( is => 'rwp' );
-has mag_filter => ( is => 'rwp' );
-has wrap_s     => ( is => 'rwp' );
-has wrap_t     => ( is => 'rwp' );
+has min_filter => ( is => 'rw', trigger => sub { shift->_maybe_apply_gl_texparam(OpenGL::GL_TEXTURE_MIN_FILTER, shift) } );
+has mag_filter => ( is => 'rw', trigger => sub { shift->_maybe_apply_gl_texparam(OpenGL::GL_TEXTURE_MAG_FILTER, shift) } );
+has wrap_s     => ( is => 'rw', trigger => sub { shift->_maybe_apply_gl_texparam(OpenGL::GL_TEXTURE_WRAP_S, shift) } );
+has wrap_t     => ( is => 'rw', trigger => sub { shift->_maybe_apply_gl_texparam(OpenGL::GL_TEXTURE_WRAP_T, shift) } );
+
+# Until loaded, changes to these parameters are just stored in the object.
+# After loading, changes need pushed to GL, which also requires binding the texture.
+sub _maybe_apply_gl_texparam {
+	my ($self, $param, $val)= @_;
+	return unless $self->loaded;
+	$self->bind;
+	OpenGL::glTexParameteri(OpenGL::GL_TEXTURE_2D, $param, $val);
+}
 
 =head1 METHODS
 
@@ -204,11 +217,14 @@ sub _load_png_data_and_rescale {
 	$bit_depth == 8
 		or croak "$fname must be encoded with 8-bit color channels";
 	
-	# Get the row data and scale it to a square if needed
-	my $dataref= \join('', @{ $png->get_rows });
+	# Get the row data and scale it to a square if needed.
+	# PNG data is stored top-to-bottom, but OpenGL considers 0,0 the lower left corner.
+	my $dataref= \join('', reverse @{ $png->get_rows });
+	# Should have exactly the number of bytes for pixels, no extra padding or alignment
 	length($$dataref) == ($has_alpha? 4 : 3) * $width * $height
 		or croak sprintf "$fname does not contain the expected number of data bytes (%d != %d * %d * %d)",
 			length($$dataref), $has_alpha? 4:3, $width, $height;
+	# Result is a ref to a scalar, to avoid copying
 	$dataref= _rescale_to_pow2_square($width, $height, $has_alpha, $use_bgr? 1 : 0, $dataref)
 		unless $width == $height && $width == _round_up_pow2($width);
 	return $dataref, $width, $height;
@@ -221,54 +237,50 @@ might want to load into a texture.  Integrating libktx is on my list.
 
 =head2 render
 
-  $tex->render( %args );
-  # keys %args= x, y, w, h, scale, center
+  $tex->render( %opts );
 
 Render the texture as a plain rectangle with optional coordinate/size modifications.
 Implies a call to C</bind> which might also trigger L</load>.
 
+Assumes you have already enabled GL_TEXTURE_2D, and that you are not using shaders.
+(future versions might include a shader-compatible implementation)
+
 =over
 
-=item x, y
+=item C<x>, C<y>
 
-Use specified origin point. Defaults to (0,0) otherwise.
+Use specified origin point. Uses (0,0) if these are not provided.
 
-=item w, h
+=item C<w>, C<h>
 
-Use specified with and/or height.  Defaults to pixel dimensions of the source image, unless
-only one is specified then it calculates the other using the aspect ratio.  If source
-dimensions are not set, it uses the actual texture dimensions.
+Use specified width and/or height.  If undefined, defaults to pixel dimensions of the source
+image, unless only one is specified then it calculates the other using the aspect ratio.
+If source dimensions are not set, it uses the actual texture dimensions.  These may or might
+not make sense for your current OpenGL coordinate space.
 
-=item scale
+=item C<scale>
 
-Multiply coordinates by this number.
+Multiply width and height by this number.
 
-=item center
+=item C<center>
 
-Center the image on the origin, instead of using it as the corner
+Center the image on the origin, instead of using the origin as the lower-left corner.
+
+=item C<s>, C<t>
+
+Starting offset texture coordinates for the lower-left corner.
+
+=item C<s_rep>, C<t_rep>
+
+The number of repititions of the texture to use across the face of the described rectangle.
+These won't give the desired result if you set the wrap mode of the texture to GL_CLAMP.
 
 =back
 
 =cut
 
 sub render {
-	my $self= shift;
-	my %args= @_ == 1? @{ $_[0] } : @_;
-	$self->_render(@args{qw/ x y w h scale center /});
-}
-
-=head2 render_xywh
-
-  $tex->render_xywh( $x, $y, $w, $h );
-
-Slightly more efficient way to call C<< $tex->render( x => $x, y => $y, w => $w, h => $h ); >>.
-Any argument may be undefined to use the defaults.
-
-=cut
-
-sub render_xywh {
-	my ($self, $x, $y, $w, $h)= @_;
-	$self->_render($x, $y, $w, $h, undef, undef);
+	shift->_render(@_ == 1 && ref $_[0] eq 'HASH'? %{$_[0]} : @_);
 }
 
 =head1 CLASS FUNCTIONS

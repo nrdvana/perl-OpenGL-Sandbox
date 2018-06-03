@@ -2,7 +2,9 @@
 use strict;
 use warnings;
 use FindBin;
+use Try::Tiny;
 use Test::More;
+use JSON;
 use X11::GLX::DWIM;
 
 use_ok( 'OpenGL::Sandbox::Texture' ) or BAIL_OUT;
@@ -61,6 +63,31 @@ subtest load_png => sub {
 			is( $tx2->width, $tx->width, 'width after convert to rgb' );
 			is_deeply( $glx->get_gl_errors//{}, {}, 'no GL error' );
 		};
+	}
+};
+
+subtest render => sub {
+	my $tx1= OpenGL::Sandbox::Texture->new(filename => "$datadir/tex/8x8.png")->load;
+	my $tx2= OpenGL::Sandbox::Texture->new(filename => "$datadir/tex/14x7-rgba.png")->load;
+	my @tests= (
+		[ ],
+		[ center => 1 ],
+		[ x => 1.5 ],
+		[ y => 1.5 ],
+		[ z => 1.5 ],
+		[ w => 1, h => 1 ],
+		[ w => 1 ],
+		[ h => 1 ],
+		[ scale => 4 ],
+		[ s => .1 ],
+		[ t => .1 ],
+		[ s_rep => 5 ],
+		[ t_rep => 5 ],
+	);
+	# Can't actually check result, but just check for exceptions
+	for my $t (@tests) {
+		is( (try{ $tx1->render(@$t); '' } catch {$_}), '', 'render sq   '.JSON->new->canonical->encode($t) );
+		is( (try{ $tx2->render(@$t); '' } catch {$_}), '', 'render rect '.JSON->new->canonical->encode($t) );
 	}
 };
 

@@ -36,6 +36,11 @@ void DESTROY(HV *self) {
 	}
 }
 
+/* This function operates on the idea that a power of two texture composed of
+ * RGB or RGBA pixels must either be 4*4*4...*4 or 4*4*4...*3 bytes long.
+ * So, it will either be a clean power of 4, or a power of 4 times 3.
+ * This iteratively divides by 4, then checks to see if the result is 1 or 3.
+ */
 int _dimension_from_filesize(int filesize, int *has_alpha_out) {
 	int dim= 1, size= filesize;
 	if (size) {
@@ -56,6 +61,9 @@ int _dimension_from_filesize(int filesize, int *has_alpha_out) {
 	}
 }
 
+/* Reading from perl hashes is annoying.  This simplified function only returns
+ * non-NULL if the key existed and the value was defined.
+ */
 SV *_fetch_if_defined(HV *self, const char *field, int len) {
 	SV **field_p= hv_fetch(self, field, len, 0);
 	return (field_p && *field_p && SvOK(*field_p)) ? *field_p : NULL;
@@ -197,14 +205,49 @@ void _bind_tx(HV *self, ...) {
 	Inline_Stack_Void;
 }
 
-void _render(HV *self, SV *x_sv, SV *y_sv, SV *w_sv, SV *h_sv, SV *scale, SV *center) {
-	SV **fp, *def_w, *def_h;
-	double x= SvOK(x_sv)? SvNV(x_sv) : 0;
-	double y= SvOK(y_sv)? SvNV(y_sv) : 0;
-	double w, h, s;
+void _render(HV *self, ...) {
+	SV *value, *w_sv= NULL, *h_sv= NULL, *def_w, *def_h;
+	double x= 0, y= 0, z= 0, s= 0, t= 0, s_rep= 1, t_rep= 1;
+	double w, h, scale= 1;
+	int i, center= 0;
+	const char *key;
+	
+	Inline_Stack_Vars;
+	if (!(Inline_Stack_Items & 1))
+		/* stack items includes $self, so an actual odd number is a logical even number */
+		croak("Odd number of parameters passed to ->render");
+
+	for (i= 1; i < Inline_Stack_Items-1; i+= 2) {
+		key= SvPV_nolen(Inline_Stack_Item(i));
+		value= Inline_Stack_Item(i+1);
+		if (!SvOK(value)) continue; /* ignore anything that isn't defined */
+		switch (*key) {
+		case 'x': if (!key[1]) x= SvNV(value);
+			else
+		case 'y': if (!key[1]) y= SvNV(value);
+			else
+		case 'z': if (!key[1]) z= SvNV(value);
+			else
+		case 'w': if (!key[1]) w_sv= value;
+			else
+		case 'h': if (!key[1]) h_sv= value;
+			else
+		case 't': if (!key[1]) t= SvNV(value);
+			else if (strcmp("t_rep", key) == 0) t_rep= SvNV(value);
+			else
+		case 's': if (!key[1]) s= SvNV(value);
+			else if (strcmp("s_rep", key) == 0) s_rep= SvNV(value);
+			else if (strcmp("scale", key) == 0) scale= SvNV(value);
+			else
+		case 'c': if (strcmp("center", key) == 0) center= SvTRUE(value);
+			else
+		default:
+			croak("Invalid key '%s' in call to render()", key);
+		}
+	}
 	/* width and height default to the src_width and src_height, or width, height.
 	 * but, if one one dimension given, then use those defaults as an aspect ratio to calculate the other */
-	if (SvOK(w_sv) && SvOK(h_sv)) {
+	if (w_sv && h_sv) {
 		w= SvNV(w_sv);
 		h= SvNV(h_sv);
 	}
@@ -216,11 +259,11 @@ void _render(HV *self, SV *x_sv, SV *y_sv, SV *w_sv, SV *h_sv, SV *scale, SV *ce
 		if (!def_h) def_h= _fetch_if_defined(self, "height", 6);
 		if (!def_h) croak("No height defined on texture");
 		/* depending which we have, multiply by aspect ratio to calculate the other */
-		if (SvOK(w_sv)) {
+		if (w_sv) {
 			w= SvNV(w_sv);
 			h= w * SvNV(def_h) / SvNV(def_w);
 		}
-		else if (SvOK(h_sv)) {
+		else if (h_sv) {
 			h= SvNV(h_sv);
 			w= h * SvNV(def_w) / SvNV(def_h);
 		}
@@ -230,25 +273,26 @@ void _render(HV *self, SV *x_sv, SV *y_sv, SV *w_sv, SV *h_sv, SV *scale, SV *ce
 		}
 	}
 	/* If scaled, adjust w,h */
-	if (SvOK(scale)) {
-		s= SvNV(scale);
-		w *= s;
-		h *= s;
-	}
+	w *= scale;
+	h *= scale;
 	/* If centered, then adjust the x and y */
-	if (SvOK(center) && SvTRUE(center)) {
+	if (center) {
 		x -= w * .5;
 		y -= h * .5;
 	}
+	//printf("Rendering texture: x=%.5f y=%.5f w=%.5f h=%.5f s=%.5f t=%.5f s_rep=%.5f t_rep=%.5f\n",
+	//	x, y, w, h, s, t, s_rep, t_rep);
 	
+	/* TODO: If texture is NonPowerOfTwo, then multiply the s_rep and t_rep values. */
 	glBegin(GL_QUADS);
-	glTexCoord2d(0, 0);
+	glTexCoord2d(s, t);
 	glVertex2d(x, y);
-	glTexCoord2d(1, 0);
+	glTexCoord2d(s+s_rep, t);
 	glVertex2d(x+w, y);
-	glTexCoord2d(1, 1);
+	glTexCoord2d(s+s_rep, t+t_rep);
 	glVertex2d(x+w, y+h);
-	glTexCoord2d(0, 1);
+	glTexCoord2d(s, t+t_rep);
 	glVertex2d(x, y+h);
 	glEnd();
+	Inline_Stack_Void;
 }
