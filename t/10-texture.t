@@ -7,9 +7,9 @@ use X11::GLX::DWIM;
 
 use_ok( 'OpenGL::Sandbox::Texture' ) or BAIL_OUT;
 
-my $glx= X11::GLX::DWIM->new(window => 1);
+my $glx= X11::GLX::DWIM->new();
+$glx->target({ pixmap => { width => 128, height => 128 } });
 note 'GL Version '.$glx->glx_version;
-$glx->target($glx->create_render_pixmap({ width => 100, height => 100 }));
 
 # Create tmp dir for this script
 my $tmp= "$FindBin::Bin/tmp/$FindBin::Script";
@@ -31,6 +31,7 @@ subtest load_rgb => sub {
 				my $tx= OpenGL::Sandbox::Texture->new(filename => $fname)->load;
 				is( $tx->width, $dim, "width=$dim" );
 				is( $tx->height, $dim, "height=$dim" );
+				is( $tx->pow2_size, $dim, "pow2_size=$dim" );
 				ok( !$tx->mipmap, "no mipmaps" );
 				is( !!$tx->has_alpha, !!$alpha, "has_alpha=$alpha" );
 				is_deeply( $glx->get_gl_errors//{}, {}, 'no GL error' );
@@ -41,16 +42,19 @@ subtest load_rgb => sub {
 
 subtest load_png => sub {
 	my @tests= (
-		[ '8x8.png', 8, 8, 0 ],
-		[ '14x7-rgba.png', 16, 16, 1 ]
+		[ '8x8.png', 8, 8, 8, 0, 8, 8 ],
+		[ '14x7-rgba.png', 16, 16, 16, 1, 14, 7 ]
 	);
 	for (@tests) {
-		my ($fname, $width, $height, $has_alpha)= @$_;
+		my ($fname, $width, $height, $pow2, $has_alpha, $src_w, $src_h)= @$_;
 		subtest $fname => sub {
 			my $tx= OpenGL::Sandbox::Texture->new(filename => "$datadir/tex/$fname")->load;
 			is( $tx->width, $width, 'width' );
 			is( $tx->height, $height, 'height' );
+			is( $tx->pow2_size, $pow2, 'pow2_size' );
 			is( $tx->has_alpha, $has_alpha, 'alpha' );
+			is( $tx->src_width, $src_w, 'src_width' );
+			is( $tx->src_height, $src_h, 'src_height' );
 			
 			OpenGL::Sandbox::Texture::convert_png("$datadir/tex/$fname", "$tmp/$fname.rgb");
 			my $tx2= OpenGL::Sandbox::Texture->new(filename => "$tmp/$fname.rgb")->load;

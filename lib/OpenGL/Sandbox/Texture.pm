@@ -20,17 +20,37 @@ creation of the texture id L<tx_id>.
 
 Gets executed as C<< $tex->$loader($filename) >>.
 
+=head2 loaded
+
+Boolean; whether any image data has been loaded yet.  This is not automatically aware of data
+you load yourself via calls to glTexImage or glTexSubImage.
+
+=head2 src_width
+
+Original width of the texture before it might have been rescaled to a square power of two.
+
+=head2 src_height
+
+Original height of the texture before it might have been rescaled to a square power of two.
+
 =head2 tx_id
 
 Lazy-built OpenGL texture ID (integer).  Triggers L</load> if image is not yet loaded.
 
 =head2 width
 
-Width of texture, in texels
+Width of texture, in texels.
 
 =head2 height
 
 Height of texture, in texels.  Currently will always equal width.
+
+=head2 pow2_size
+
+If texture is loaded as a square power-of-two (currently all are) then this returns the
+dimension of the texture.  This can differ from width/height in the event that you configured
+those with the logical dimensions of the image.  If texture was loaded as a rectangular texture,
+this is undef.
 
 =head2 has_alpha
 
@@ -47,9 +67,12 @@ mipmaps will be automatically generated.
 has filename   => ( is => 'rw' );
 has loader     => ( is => 'rw' );
 has loaded     => ( is => 'rw' );
+has src_width  => ( is => 'rw' );
+has src_height => ( is => 'rw' );
 has tx_id      => ( is => 'rw', lazy => 1, builder => 1 );
 has width      => ( is => 'rwp' );
 has height     => ( is => 'rwp' );
+has pow2_size  => ( is => 'rw' );
 has has_alpha  => ( is => 'rwp' );
 has mipmap     => ( is => 'rwp' );
 has min_filter => ( is => 'rwp' );
@@ -153,7 +176,10 @@ coordinates.  That could be a useful addition.
 sub load_png {
 	my ($self, $fname)= @_;
 	my $use_bgr= 1; # TODO: check OpenGL for optimal format
-	$self->_load_rgb_square(_load_png_data_and_rescale($fname, $use_bgr), $use_bgr);
+	my ($imgref, $w, $h)= _load_png_data_and_rescale($fname, $use_bgr);
+	$self->_load_rgb_square($imgref, $use_bgr);
+	$self->src_width($w);
+	$self->src_height($h);
 	$self->loaded(1);
 	return $self;
 }
@@ -185,13 +211,65 @@ sub _load_png_data_and_rescale {
 			length($$dataref), $has_alpha? 4:3, $width, $height;
 	$dataref= _rescale_to_pow2_square($width, $height, $has_alpha, $use_bgr? 1 : 0, $dataref)
 		unless $width == $height && $width == _round_up_pow2($width);
-	return $dataref;
+	return $dataref, $width, $height;
 }
 
 =head2 TODO: load_ktx
 
 OpenGL has its own image file format designed to directly handle all the various things you
 might want to load into a texture.  Integrating libktx is on my list.
+
+=head2 render
+
+  $tex->render( %args );
+  # keys %args= x, y, w, h, scale, center
+
+Render the texture as a plain rectangle with optional coordinate/size modifications.
+Implies a call to C</bind> which might also trigger L</load>.
+
+=over
+
+=item x, y
+
+Use specified origin point. Defaults to (0,0) otherwise.
+
+=item w, h
+
+Use specified with and/or height.  Defaults to pixel dimensions of the source image, unless
+only one is specified then it calculates the other using the aspect ratio.  If source
+dimensions are not set, it uses the actual texture dimensions.
+
+=item scale
+
+Multiply coordinates by this number.
+
+=item center
+
+Center the image on the origin, instead of using it as the corner
+
+=back
+
+=cut
+
+sub render {
+	my $self= shift;
+	my %args= @_ == 1? @{ $_[0] } : @_;
+	$self->_render(@args{qw/ x y w h scale center /});
+}
+
+=head2 render_xywh
+
+  $tex->render_xywh( $x, $y, $w, $h );
+
+Slightly more efficient way to call C<< $tex->render( x => $x, y => $y, w => $w, h => $h ); >>.
+Any argument may be undefined to use the defaults.
+
+=cut
+
+sub render_xywh {
+	my ($self, $x, $y, $w, $h)= @_;
+	$self->_render($x, $y, $w, $h, undef, undef);
+}
 
 =head1 CLASS FUNCTIONS
 
@@ -208,7 +286,7 @@ This does not require an OpenGL context.
 sub convert_png {
 	my ($src, $dst)= @_;
 	my $use_bgr= $dst =~ /\.bgr$/? 1 : 0;
-	my $dataref= _load_png_data_and_rescale($src, $use_bgr);
+	my ($dataref)= _load_png_data_and_rescale($src, $use_bgr);
 	open my $dst_fh, '>', $dst or croak "open($dst): $!";
 	binmode $dst_fh;
 	print $dst_fh $$dataref;

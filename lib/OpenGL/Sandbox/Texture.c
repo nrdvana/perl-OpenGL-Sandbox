@@ -85,7 +85,7 @@ void _load_rgb_square(HV *self, SV *mmap, int is_bgr) {
 		: SvIV(min_filter_p) == GL_NEAREST || SvIV(min_filter_p) == GL_LINEAR ? 0
 		: 1;
 	
-	ver= glGetString(GL_VERSION);
+	ver= (const char *) glGetString(GL_VERSION);
 	if (!ver) croak("Can't get GL_VERSION");
 	
 	/* Bind texture */
@@ -128,13 +128,15 @@ void _load_rgb_square(HV *self, SV *mmap, int is_bgr) {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, SvIV(wrap_t_p));
 
 	/* update attributes */
-	if (!hv_store(self, "width",  5, sv=newSViv(dim), 0)) goto store_fail;
-	if (!hv_store(self, "height", 6, sv=newSViv(dim), 0)) goto store_fail;
-	if (!hv_store(self, "has_alpha", 9, sv=newSViv(has_alpha? 1 : 0), 0)) goto store_fail;
+	if (!hv_store(self, "width",     5, sv=newSViv(dim), 0)
+	 || !hv_store(self, "height",    6, sv=newSViv(dim), 0)
+	 || !hv_store(self, "pow2_size", 9, sv=newSViv(dim), 0)
+	 || !hv_store(self, "has_alpha", 9, sv=newSViv(has_alpha? 1 : 0), 0)
+	) {
+		if (sv) sv_2mortal(sv);
+		croak("Can't store results in supplied hash");
+	}
 	return;
-store_fail:
-	if (sv) sv_2mortal(sv);
-	croak("Can't store results in supplied hash");
 }
 
 int _round_up_pow2(long dim) {
@@ -193,4 +195,60 @@ void _bind_tx(HV *self, ...) {
 		target= SvIV(Inline_Stack_Item(1));
 	glBindTexture(_lazy_build_tx_id(self), target);
 	Inline_Stack_Void;
+}
+
+void _render(HV *self, SV *x_sv, SV *y_sv, SV *w_sv, SV *h_sv, SV *scale, SV *center) {
+	SV **fp, *def_w, *def_h;
+	double x= SvOK(x_sv)? SvNV(x_sv) : 0;
+	double y= SvOK(y_sv)? SvNV(y_sv) : 0;
+	double w, h, s;
+	/* width and height default to the src_width and src_height, or width, height.
+	 * but, if one one dimension given, then use those defaults as an aspect ratio to calculate the other */
+	if (SvOK(w_sv) && SvOK(h_sv)) {
+		w= SvNV(w_sv);
+		h= SvNV(h_sv);
+	}
+	else {
+		def_w= _fetch_if_defined(self, "src_width", 9);
+		if (!def_w) def_w= _fetch_if_defined(self, "width", 5);
+		if (!def_w) croak("No width defined on texture");
+		def_h= _fetch_if_defined(self, "src_height", 10);
+		if (!def_h) def_h= _fetch_if_defined(self, "height", 6);
+		if (!def_h) croak("No height defined on texture");
+		/* depending which we have, multiply by aspect ratio to calculate the other */
+		if (SvOK(w_sv)) {
+			w= SvNV(w_sv);
+			h= w * SvNV(def_h) / SvNV(def_w);
+		}
+		else if (SvOK(h_sv)) {
+			h= SvNV(h_sv);
+			w= h * SvNV(def_w) / SvNV(def_h);
+		}
+		else {
+			w= SvNV(def_w);
+			h= SvNV(def_h);
+		}
+	}
+	/* If scaled, adjust w,h */
+	if (SvOK(scale)) {
+		s= SvNV(scale);
+		w *= s;
+		h *= s;
+	}
+	/* If centered, then adjust the x and y */
+	if (SvOK(center) && SvTRUE(center)) {
+		x -= w * .5;
+		y -= h * .5;
+	}
+	
+	glBegin(GL_QUADS);
+	glTexCoord2d(0, 0);
+	glVertex2d(x, y);
+	glTexCoord2d(1, 0);
+	glVertex2d(x+w, y);
+	glTexCoord2d(1, 1);
+	glVertex2d(x+w, y+h);
+	glTexCoord2d(0, 1);
+	glVertex2d(x, y+h);
+	glEnd();
 }
