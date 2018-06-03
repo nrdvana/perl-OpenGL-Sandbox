@@ -6,6 +6,7 @@ use Try::Tiny;
 use Test::More;
 use JSON;
 use X11::GLX::DWIM;
+use Log::Any::Adapter 'TAP';
 
 use_ok( 'OpenGL::Sandbox::Texture' ) or BAIL_OUT;
 

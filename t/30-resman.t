@@ -24,6 +24,7 @@ is( $res->tex_default_fmt, 'bgr', 'default pixel format' );
 
 isa_ok( $res->tex('default'), 'OpenGL::Sandbox::Texture', 'load default tex' );
 is( $res->tex('8x8'), $res->tex('default'), '8x8 is default' );
+$res->tex('8x8')->load;
 is( $res->tex('8x8')->width, 8, 'width=8' );
 
 done_testing;

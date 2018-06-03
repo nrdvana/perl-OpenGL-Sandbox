@@ -2,7 +2,9 @@ package OpenGL::Sandbox;
 use strict;
 use warnings;
 use Try::Tiny;
+use Exporter;
 use Carp;
+require OpenGL::Sandbox::ResMan;
 
 # ABSTRACT: Rapid-prototyping utilities for OpenGL
 
@@ -10,33 +12,53 @@ use Carp;
 
 =head2 $res
 
-Returns a global instance of the resource manager with resource_root_dir
-pointing to the current directory.
+Returns a default global instance of the L<resource manager|OpenGL::Sandbox::ResMan>
+with C<resource_root_dir> pointing to the current directory.
 
-=head2 :v1
+=head2 font
 
-Exports the OpenGL API 1.x functions and constants, and also convenient aliases
-and helper functions from L<OpenGL::Sandbox::V1> (which must be installed
-separately).
+Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->font >>
+
+=head2 tex
+
+Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->tex >>
+
+=head2 :V1 ...
+
+Exports everything from L<OpenGL::Sandbox::V1> (which must be installed separately).
+This module contains many "sugar" functions to make the GL API more friendly.
+
+C<:V2>, C<:V3>, etc will likewise import everything from packages named
+C<OpenGL::SandBox::$_> (which do not currently exist, but could be authored
+in the future)
 
 =cut
 
+our @EXPORT_OK= qw( font tex );
+our %EXPORT_TAGS= ( all => \@EXPORT_OK );
+
 sub import {
 	my $caller= caller;
-	my $class= shift;
-	while (defined(my $arg=shift)) {
+	my @normal;
+	for (reverse 1..$#_) {
+		my $arg= $_[$_];
 		if ($arg eq '$res') {
+			my $res= OpenGL::Sandbox::ResMan->default_instance;
 			no strict 'refs';
-			my $res= __PACKAGE__->default_instance;
 			*{$caller.'::res'}= \$res;
+			splice(@_, $_, 1);
 		}
-		elsif ($arg eq 'v1') {
-			eval "package $caller; use OpenGL::Sandbox::V1 ':all'"
-				or croak "Can't load OpenGL::Sandbox::V1 (note that this must be installed separately)\n  $@";
+		elsif ($arg =~ /^:V(\d)$/) {
+			my $mod= "OpenGL::Sandbox::V$1";
+			eval "package $caller; use $mod ':all'; 1"
+				or croak "Can't load $mod (note that this must be installed separately)\n  $@";
+			splice(@_, $_, 1);
 		}
-		else {
-			croak "'$arg' is not exported by ".__PACKAGE__."\n";
 	}
+	goto \&Exporter::import;
 }
+
+sub font { OpenGL::Sandbox::ResMan->default_instance->font(@_) }
+sub tex  { OpenGL::Sandbox::ResMan->default_instance->tex(@_) }
 
 1;

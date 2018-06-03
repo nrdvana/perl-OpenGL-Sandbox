@@ -79,10 +79,10 @@ has height     => ( is => 'rwp' );
 has pow2_size  => ( is => 'rw' );
 has has_alpha  => ( is => 'rwp' );
 has mipmap     => ( is => 'rwp' );
-has min_filter => ( is => 'rw', trigger => sub { shift->_maybe_apply_gl_texparam(OpenGL::GL_TEXTURE_MIN_FILTER, shift) } );
-has mag_filter => ( is => 'rw', trigger => sub { shift->_maybe_apply_gl_texparam(OpenGL::GL_TEXTURE_MAG_FILTER, shift) } );
-has wrap_s     => ( is => 'rw', trigger => sub { shift->_maybe_apply_gl_texparam(OpenGL::GL_TEXTURE_WRAP_S, shift) } );
-has wrap_t     => ( is => 'rw', trigger => sub { shift->_maybe_apply_gl_texparam(OpenGL::GL_TEXTURE_WRAP_T, shift) } );
+has min_filter => ( is => 'rw', trigger => sub { shift->_maybe_apply_gl_texparam(OpenGL::GL_TEXTURE_MIN_FILTER(), shift) } );
+has mag_filter => ( is => 'rw', trigger => sub { shift->_maybe_apply_gl_texparam(OpenGL::GL_TEXTURE_MAG_FILTER(), shift) } );
+has wrap_s     => ( is => 'rw', trigger => sub { shift->_maybe_apply_gl_texparam(OpenGL::GL_TEXTURE_WRAP_S(), shift) } );
+has wrap_t     => ( is => 'rw', trigger => sub { shift->_maybe_apply_gl_texparam(OpenGL::GL_TEXTURE_WRAP_T(), shift) } );
 
 # Until loaded, changes to these parameters are just stored in the object.
 # After loading, changes need pushed to GL, which also requires binding the texture.
@@ -90,7 +90,7 @@ sub _maybe_apply_gl_texparam {
 	my ($self, $param, $val)= @_;
 	return unless $self->loaded;
 	$self->bind;
-	OpenGL::glTexParameteri(OpenGL::GL_TEXTURE_2D, $param, $val);
+	OpenGL::glTexParameteri(OpenGL::GL_TEXTURE_2D(), $param, $val);
 }
 
 =head1 METHODS
@@ -110,7 +110,7 @@ Returns C<$self> for convenient chaining.
 
 sub bind {
 	my ($self, $target)= @_;
-	OpenGL::glBindTexture($self->tx_id, $target // OpenGL::GL_TEXTURE_2D);
+	OpenGL::glBindTexture($target // OpenGL::GL_TEXTURE_2D(), $self->tx_id);
 	if (!$self->loaded && (defined $self->loader || defined $self->filename)) {
 		$self->load;
 	}
@@ -280,6 +280,7 @@ These won't give the desired result if you set the wrap mode of the texture to G
 =cut
 
 sub render {
+	$_[0]->bind;
 	shift->_render(@_ == 1 && ref $_[0] eq 'HASH'? %{$_[0]} : @_);
 }
 

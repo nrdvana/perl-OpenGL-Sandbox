@@ -268,7 +268,7 @@ sub load_texture {
 	# $info is pair if [$inode_key, $real_path].  Check if inode is already loaded
 	# with these same options.
 	unless ($tex= $self->_texture_cache->{$info->[0] . $opt_key}) {
-		$tex= OpenGL::Sandbox::Texture->new(\%options)->load($info->[1]);
+		$tex= OpenGL::Sandbox::Texture->new(%options, filename => $info->[1]);
 		$self->_texture_cache->{$info->[0] . $opt_key}= $tex;
 	}
 	$self->_texture_cache->{$name}= $tex;
