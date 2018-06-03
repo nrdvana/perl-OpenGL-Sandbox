@@ -3,6 +3,7 @@ use strict;
 use warnings;
 use FindBin;
 use File::Spec::Functions 'catdir';
+use Time::HiRes 'sleep';
 use Test::More;
 use Log::Any::Adapter 'TAP';
 use X11::GLX::DWIM;
@@ -19,34 +20,39 @@ $res->resource_root_dir(catdir($FindBin::Bin, 'data'));
 
 # First frame seems to get lost, unless I sleep a bit
 sleep 1;
+
+OpenGL::glEnable(OpenGL::GL_TEXTURE_2D);
+OpenGL::glEnable(OpenGL::GL_BLEND);
+OpenGL::glBlendFunc(OpenGL::GL_SRC_ALPHA, OpenGL::GL_ONE);
+
+# Render solid blue, as a test
 $glx->display->flush_sync;
 $glx->begin_frame;
 OpenGL::glClearColor(0,0,1,1);
 OpenGL::glClear(OpenGL::GL_COLOR_BUFFER_BIT);
 $glx->end_frame;
 $glx->display->flush_sync;
-sleep 1;
+sleep .5;
 
 # Render texture at 0,0
 OpenGL::glClearColor(0,0,0,1);
-OpenGL::glEnable(OpenGL::GL_TEXTURE_2D);
-#OpenGL::glBlendFunc(OpenGL::GL_SRC_ALPHA, OpenGL::GL_ONE);
 $res->tex('8x8')->wrap_s(OpenGL::GL_CLAMP);
 $res->tex('8x8')->wrap_t(OpenGL::GL_CLAMP);
+sleep .5;
 
 # Render scaled to 1/4 the window
 $glx->begin_frame;
 $res->tex('8x8')->render(scale => 16);
 $glx->end_frame;
 $glx->display->flush_sync;
-sleep 1;
+sleep .5;
 
 # Render full-window, ignoring native texture dimensions
 $glx->begin_frame;
 $res->tex('8x8')->render(w => 256, center => 1);
 $glx->end_frame;
 $glx->display->flush_sync;
-sleep 1;
+sleep .5;
 
 # Render repeated 9 times across the window
 $res->tex('8x8')->wrap_s(OpenGL::GL_REPEAT);
@@ -55,6 +61,15 @@ $glx->begin_frame;
 $res->tex('8x8')->render(w => 256, center => 1, s_rep => 9, t_rep => 9);
 $glx->end_frame;
 $glx->display->flush_sync;
-sleep 1;
+sleep .5;
+
+OpenGL::glClearColor(0,.2,.3,1);
+$glx->begin_frame;
+$res->tex('14x7-rgba')->render(w => 256, center => 1, s_rep => 9, t_rep => 9);
+$glx->end_frame;
+$glx->display->flush_sync;
+sleep .5;
+
+sleep .5;
 
 done_testing;

@@ -9,9 +9,9 @@ use X11::GLX::DWIM;
 
 use_ok( 'OpenGL::Sandbox::ResMan' ) or BAIL_OUT;
 
-my $glx= X11::GLX::DWIM->new(window => 1);
+my $glx= X11::GLX::DWIM->new();
+$glx->target({ pixmap => { width => 128, height => 128 }});
 note 'GL Version '.$glx->glx_version;
-$glx->target($glx->create_render_pixmap({ width => 100, height => 100 }));
 
 my $res= OpenGL::Sandbox::ResMan->default_instance;
 $res->resource_root_dir(catdir($FindBin::Bin, 'data'));
