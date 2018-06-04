@@ -8,7 +8,6 @@ use Log::Any '$log';
 use OpenGL::Sandbox::MMap;
 use OpenGL::Sandbox::Font;
 use OpenGL::Sandbox::Texture;
-use JSON::MaybeXS ();
 use File::Find ();
 use Scalar::Util ();
 
@@ -42,17 +41,36 @@ The path where resources are located, adhering to the basic layout of:
 
 =head2 font_config
 
-A hashref of font names which holds default constructor options.  By default,
-fonts are loaded as texture-fonts, rendered at 24px.  For larger resolutions,
-or to render the font in 3D or other modes, you can set options here so that
-they get loaded on demand.
+A hashref of font names which holds default L<OpenGL::Sandbox::Font|font> constructor
+options.  The hash key of C<'*'> can be used to apply default values to every font.
+The font named 'default' can be configured here instead of needing a file of that name in
+the C<font/> directory.
+
+Example font_config:
+
+  {
+    '*'     => { face_size => 48 }, # default settings get applied to all configs
+    3d      => { face_size => 64, type => 'FTExtrudeFont' },
+    default => { face_size => 32, filename => 'myfont1' }, # font named 'default'
+    myfont2 => 'myfont1',  # alias
+  }
 
 =head2 tex_config
 
-A hashref of texture names which holds default texture constructor options.
-By default, textures are loaded as a single square power-of-two (stretching
-a rectangular image as needed) with no mip-mapping.  These options can specify
-that mipmap levels should be generated, or enable non-power-of-two mode.
+A hashref of texture names which holds default L<OpenGL::Sandbox::Texture|texture> constructor
+options.  The hash key of C<'*'> can be used to apply default values to every texture.
+The texture named 'default' can be configured here instead of needing a file of that name in
+the C<tex/> directory.
+
+Example tex_config:
+
+  {
+    '*'     => { wrap_s => GL_CLAMP,  wrap_t => GL_CLAMP  },
+    default => { filename => 'foo.png' }, # texture named "default"
+    tile1   => { wrap_s => GL_REPEAT, wrap_t => GL_REPEAT },
+    blocky  => { mag_filter => GL_NEAREST },
+    alias1  => 'tile1',
+  }
 
 =cut
 
@@ -90,15 +108,6 @@ sub _build__texture_dir_cache {
 }
 sub _build__font_dir_cache {
 	$_[0]->_cache_directory(catdir($_[0]->resource_root_dir, 'font'));
-}
-
-sub clear_cache {
-	my $self= shift;
-	$self->_clear_texture_cache;
-	$self->_clear_texture_dir_cache;
-	$self->_clear_font_cache;
-	$self->_clear_fontdata_cache;
-	$self->_clear_font_dir_cache;
 }
 
 =head1 METHODS
@@ -178,10 +187,14 @@ sub load_font {
 	my ($self, $name, %options)= @_;
 	$self->_font_cache->{$name} ||= do {
 		$log->debug("loading font $name");
-		my $defaults= $self->font_config->{$name} || {};
-		%options= ( file => $name, %$defaults, %options );
-		my $fname= delete $options{file};
-		my $font_data= $self->load_fontdata($fname);
+		my $name_cfg= $self->font_config->{$name} // {};
+		# Check for alias
+		ref $name_cfg
+			or return $self->load_font($name_cfg);
+		# Merge options, configured options, and configured defaults
+		my $default_cfg= $self->font_config->{'*'} // {};
+		%options= ( filename => $name, %$default_cfg, %$name_cfg, %options );
+		my $font_data= $self->load_fontdata($options{filename});
 		OpenGL::Sandbox::Font->new(data => $font_data, %options);
 	};
 }
@@ -247,30 +260,25 @@ Dies if no matching file can be found, or if it wasn't able to process any match
 
 =cut
 
-my $json; 
-sub _options_to_key { ($json //= JSON::MaybeXS->new->canonical)->encode(shift) }
 sub load_texture {
 	my ($self, $name, %options)= @_;
 	my $tex;
 	return $tex if $tex= $self->_texture_cache->{$name};
 	
 	$log->debug("loading texture $name");
-	
+
+	my $name_cfg= $self->tex_config->{$name} // {};
+	# Check for alias
+	ref $name_cfg
+		or return $self->load_texture($name_cfg);
+
 	# Merge options, configured options, and configured defaults
-	my $default_cfg= $self->tex_config->{'*'} || {};
-	my $name_cfg= $self->tex_config->{$name} || {};
-	%options= ( file => $name, %$default_cfg, %$name_cfg, %options );
-	my $fname= delete $options{file};
-	my $opt_key= _options_to_key(\%options);
+	my $default_cfg= $self->tex_config->{'*'} // {};
+	%options= ( filename => $name, %$default_cfg, %$name_cfg, %options );
 	
-	my $info= $self->_texture_dir_cache->{$fname}
-		or croak "No such texture '$name'";
-	# $info is pair if [$inode_key, $real_path].  Check if inode is already loaded
-	# with these same options.
-	unless ($tex= $self->_texture_cache->{$info->[0] . $opt_key}) {
-		$tex= OpenGL::Sandbox::Texture->new(%options, filename => $info->[1]);
-		$self->_texture_cache->{$info->[0] . $opt_key}= $tex;
-	}
+	my $info= $self->_texture_dir_cache->{$options{filename}}
+		or croak "No such texture '$options{filename}'";
+	$tex= OpenGL::Sandbox::Texture->new(%options, filename => $info->[1]);
 	$self->_texture_cache->{$name}= $tex;
 	return $tex;
 }
@@ -311,6 +319,23 @@ sub _cache_directory {
 		}
 	}}, $path);
 	\%names;
+}
+
+=head2 clear_cache
+
+Call this method to remove all current references to any resource.  If this was the last
+reference to those resources, it will also garbage collect any OpenGL resources that had been
+allocated.  The next access to any font or texture will re-load the resource from disk.
+
+=cut
+
+sub clear_cache {
+	my $self= shift;
+	$self->_clear_texture_cache;
+	$self->_clear_texture_dir_cache;
+	$self->_clear_font_cache;
+	$self->_clear_fontdata_cache;
+	$self->_clear_font_dir_cache;
 }
 
 1;
