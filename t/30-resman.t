@@ -15,10 +15,17 @@ note 'GL Version '.$glx->glx_version;
 
 my $res= OpenGL::Sandbox::ResMan->default_instance;
 $res->resource_root_dir(catdir($FindBin::Bin, 'data'));
+$res->font_config({
+	default => 'squada',
+	squada  => { filename => 'SquadaOne-Regular', face_size => 32 },
+});
+$res->tex_config({
+	default => '8x8',
+});
 
 isa_ok( $res->font('default'), 'OpenGL::Sandbox::Font', 'load default font'  );
-is( $res->font('Empty')->data, $res->font('default')->data, 'Empty is default' );
-is( $res->font('Empty')->ascender, 0, 'look up ascender' );
+is( $res->font('squada')->data, $res->font('default')->data, 'Empty is default' );
+is( $res->font('default')->ascender, 28, 'look up ascender' );
 
 is( $res->tex_default_fmt, 'bgr', 'default pixel format' );
 
