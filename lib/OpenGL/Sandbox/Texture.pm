@@ -1,9 +1,12 @@
 package OpenGL::Sandbox::Texture;
+
 use Moo;
 use Carp;
 use Try::Tiny;
 use OpenGL ();
 use OpenGL::Sandbox::MMap;
+
+# ABSTRACT: Wrapper object for OpenGL texture
 
 =head1 ATTRIBUTES
 
@@ -37,6 +40,10 @@ Original height of the texture before it might have been rescaled to a square po
 
 Lazy-built OpenGL texture ID (integer).  Triggers L</load> if image is not yet loaded.
 
+=head2 has_tx_id
+
+Check this to find out whether tx_id has been initialized.
+
 =head2 width
 
 Width of texture, in texels.
@@ -64,7 +71,20 @@ mipmaps will be automatically generated.
 
 =head2 min_filter
 
-Initialize this during object construction
+Value for GL_TEXTURE_MIN_FILTER.  Setting does not take effect until L</loaded>, but after that
+a change to this attribute takes effect immediately causing the texture to be bound.
+
+=head2 max_filter
+
+Value for GL_TEXTURE_MAX_FILTER.  See notes on L</min_filter>.
+
+=head2 wrap_s
+
+Value for GL_TEXTURE_WRAP_S.  See notes on L</min_filter>.
+
+=head2 wrap_t
+
+Value for GL_TEXTURE_WRAP_T.  See notes on L</min_filter>.
 
 =cut
 
@@ -97,7 +117,8 @@ sub _maybe_apply_gl_texparam {
 
 =head2 bind
 
-  $tex->bind( $target=GL_TEXTURE_2D )
+  $tex->bind;
+  $tex->bind( $target );
 
 Make this image the current texture for OpenGL's C<$target>, with the default of
 C<GL_TEXTURE_2D>.  If L</tx_id> does not exist yet, it gets created.  If this texture has
@@ -277,12 +298,19 @@ These won't give the desired result if you set the wrap mode of the texture to G
 
 =back
 
+=head2 render_bound
+
+Like L</render> but skips the call to L</bind>, for when you know that it is already the
+current texture.
+
 =cut
 
 sub render {
 	$_[0]->bind;
 	shift->_render(@_ == 1 && ref $_[0] eq 'HASH'? %{$_[0]} : @_);
 }
+
+*render_bound= *_render;
 
 =head1 CLASS FUNCTIONS
 

@@ -1,4 +1,5 @@
 package OpenGL::Sandbox;
+
 use strict;
 use warnings;
 use Try::Tiny;

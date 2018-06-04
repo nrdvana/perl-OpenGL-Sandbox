@@ -15,6 +15,7 @@ $glx->target({ pixmap => { width => 128, height => 128 } });
 note 'GL Version '.$glx->glx_version;
 
 # Create tmp dir for this script
+mkdir "$FindBin::Bin/tmp";
 my $tmp= "$FindBin::Bin/tmp/$FindBin::Script";
 $tmp =~ s/\.t$// or die "can't calc temp dir";
 -d $tmp || mkdir $tmp or die "Can't create dir $tmp";

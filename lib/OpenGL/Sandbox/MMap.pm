@@ -1,4 +1,5 @@
 package OpenGL::Sandbox::MMap;
+
 use strict;
 use warnings;
 use File::Map 'map_file';
