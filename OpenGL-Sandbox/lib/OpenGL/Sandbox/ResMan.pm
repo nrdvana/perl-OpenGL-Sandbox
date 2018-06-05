@@ -21,12 +21,15 @@ use Scalar::Util ();
 
 =head1 DESCRIPTION
 
-This object holds references to each image and font that you load.
+This object caches references to various OpenGL resources like textures and fonts.
 It is usually instantiated as a singleton from L</default_instance> or from
 importing the C<$res> variable from L<OpenGL::Sandbox>.  It pulls resources
 from a directory of your choice.  Where possible, files get memory-mapped
 directly into the library that uses them, which should keep the overhead of
 this library as low as possible.
+
+Note that you need to install L<OpenGL::Sandbox::V1::FTGLFont> in order to get font support,
+currently.  Other font providers might be added later.
 
 =head1 ATTRIBUTES
 
@@ -184,6 +187,12 @@ have changed.
 =cut
 
 sub load_font {
+	eval 'require OpenGL::Sandbox::V1::FTGLFont'
+		or croak "Font support requires module L<OpenGL::Sandbox::V1::FTGLFont>, and OpenGL 1.x";
+	*load_font= *_load_font;
+	goto $_[0]->can('load_font');
+}
+sub _load_font {
 	my ($self, $name, %options)= @_;
 	$self->_font_cache->{$name} ||= do {
 		$log->debug("loading font $name");
@@ -195,7 +204,7 @@ sub load_font {
 		my $default_cfg= $self->font_config->{'*'} // {};
 		%options= ( filename => $name, %$default_cfg, %$name_cfg, %options );
 		my $font_data= $self->load_fontdata($options{filename});
-		OpenGL::Sandbox::Font->new(data => $font_data, %options);
+		OpenGL::Sandbox::V1::FTGLFont->new(data => $font_data, %options);
 	};
 }
 
