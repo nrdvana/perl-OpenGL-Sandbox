@@ -5,10 +5,10 @@ use FindBin;
 use Test::More;
 use Log::Any::Adapter 'TAP';
 
-use_ok( 'OpenGL::Sandbox::Font' ) or BAIL_OUT;
+use_ok( 'OpenGL::Sandbox::V1::FTGLFont' ) or BAIL_OUT;
 
 my $mmap= OpenGL::Sandbox::MMap->new("$FindBin::Bin/data/font/SquadaOne-Regular.ttf");
-my $font= new_ok( 'OpenGL::Sandbox::Font', [ data => $mmap ], '$font' );
+my $font= new_ok( 'OpenGL::Sandbox::V1::FTGLFont', [ data => $mmap ], '$font' );
 is( $font->ascender,             21, 'ascender' );
 is( $font->descender,            -5, 'descender' );
 is( int($font->line_height),     25, 'line_height' );

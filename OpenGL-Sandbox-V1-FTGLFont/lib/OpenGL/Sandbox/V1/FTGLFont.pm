@@ -1,10 +1,23 @@
-package OpenGL::Sandbox::Font;
+package OpenGL::Sandbox::V1::FTGLFont;
 
 use Moo;
 use Cwd;
 use OpenGL::Sandbox::MMap;
 
 # ABSTRACT: Wrapper object for FTGL Fonts
+
+=head1 DESCRIPTION
+
+L<FTGL|http://ftgl.sourceforge.net/docs/html/> is a C++ library that uses the FreeType library
+to read font glyphs and encodes them as OpenGL textures or vertex geometry.
+It then handles all the details of rendering a string of text with correct font spacing.
+
+The library has a spectacularly designed API, and supports unicode, and other great things.
+Unfortunately, it is very tied to the OpenGL 1.x API, which is deprecated.
+If you are working on something simple and the 1.x API works for you, then this will solve your
+font needs and you can go merrily on your way.
+
+This module is based on L<Inline::CPP>, so it requires a C++ compiler in order to be installed.
 
 =head1 ATTRIBUTES
 

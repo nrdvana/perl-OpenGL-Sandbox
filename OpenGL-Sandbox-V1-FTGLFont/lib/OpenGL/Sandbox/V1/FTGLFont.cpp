@@ -1,6 +1,7 @@
 #include <ftgl.h>
 #include <GL/gl.h>
-#include "OpenGL_Sandbox.h"
+#define SCALAR_REF_DATA(obj) (SvROK(obj) && SvPOK(SvRV(obj))? (void*)SvPVX(SvRV(obj)) : (void*)0)
+#define SCALAR_REF_LEN(obj)  (SvROK(obj) && SvPOK(SvRV(obj))? SvCUR(SvRV(obj)) : 0)
 
 static const char * next_utf8(const char *str);
 static int count_utf8(const char *str);
@@ -15,8 +16,10 @@ public:
 	FTFontWrapper(SV *mmap, const char *font_class):
 		mmap_obj(mmap), font(NULL)
 	{
-		void *data= SCALAR_REF_DATA_OR_CROAK(mmap);
+		void *data= SCALAR_REF_DATA(mmap);
 		int len= SCALAR_REF_LEN(mmap);
+		if (!data || !len) croak("Expected MMap or scalar ref to non-empty font data buffer")
+		
 		/* most common first */
 		if (strcmp(font_class, "FTTextureFont") == 0)
 			font= new FTTextureFont((const unsigned char*) data, len);
