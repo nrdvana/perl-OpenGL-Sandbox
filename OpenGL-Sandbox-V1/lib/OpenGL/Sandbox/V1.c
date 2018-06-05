@@ -345,3 +345,95 @@ static void parse_color(SV *c, float *rgba) {
 			rgba[i]= hex_rgba[i] / 255.0;
 	}
 }
+
+void _texture_render(HV *self, ...) {
+	SV *value, *w_sv= NULL, *h_sv= NULL, *def_w, *def_h;
+	double x= 0, y= 0, z= 0, s= 0, t= 0, s_rep= 1, t_rep= 1;
+	double w, h, scale= 1;
+	int i, center= 0;
+	const char *key;
+	
+	Inline_Stack_Vars;
+	if (!(Inline_Stack_Items & 1))
+		/* stack items includes $self, so an actual odd number is a logical even number */
+		croak("Odd number of parameters passed to ->render");
+
+	for (i= 1; i < Inline_Stack_Items-1; i+= 2) {
+		key= SvPV_nolen(Inline_Stack_Item(i));
+		value= Inline_Stack_Item(i+1);
+		if (!SvOK(value)) continue; /* ignore anything that isn't defined */
+		switch (*key) {
+		case 'x': if (!key[1]) x= SvNV(value);
+			else
+		case 'y': if (!key[1]) y= SvNV(value);
+			else
+		case 'z': if (!key[1]) z= SvNV(value);
+			else
+		case 'w': if (!key[1]) w_sv= value;
+			else
+		case 'h': if (!key[1]) h_sv= value;
+			else
+		case 't': if (!key[1]) t= SvNV(value);
+			else if (strcmp("t_rep", key) == 0) t_rep= SvNV(value);
+			else
+		case 's': if (!key[1]) s= SvNV(value);
+			else if (strcmp("s_rep", key) == 0) s_rep= SvNV(value);
+			else if (strcmp("scale", key) == 0) scale= SvNV(value);
+			else
+		case 'c': if (strcmp("center", key) == 0) center= SvTRUE(value);
+			else
+		default:
+			croak("Invalid key '%s' in call to render()", key);
+		}
+	}
+	/* width and height default to the src_width and src_height, or width, height.
+	 * but, if one one dimension given, then use those defaults as an aspect ratio to calculate the other */
+	if (w_sv && h_sv) {
+		w= SvNV(w_sv);
+		h= SvNV(h_sv);
+	}
+	else {
+		def_w= _fetch_if_defined(self, "src_width", 9);
+		if (!def_w) def_w= _fetch_if_defined(self, "width", 5);
+		if (!def_w) croak("No width defined on texture");
+		def_h= _fetch_if_defined(self, "src_height", 10);
+		if (!def_h) def_h= _fetch_if_defined(self, "height", 6);
+		if (!def_h) croak("No height defined on texture");
+		/* depending which we have, multiply by aspect ratio to calculate the other */
+		if (w_sv) {
+			w= SvNV(w_sv);
+			h= w * SvNV(def_h) / SvNV(def_w);
+		}
+		else if (h_sv) {
+			h= SvNV(h_sv);
+			w= h * SvNV(def_w) / SvNV(def_h);
+		}
+		else {
+			w= SvNV(def_w);
+			h= SvNV(def_h);
+		}
+	}
+	/* If scaled, adjust w,h */
+	w *= scale;
+	h *= scale;
+	/* If centered, then adjust the x and y */
+	if (center) {
+		x -= w * .5;
+		y -= h * .5;
+	}
+	//printf("Rendering texture: x=%.5f y=%.5f w=%.5f h=%.5f s=%.5f t=%.5f s_rep=%.5f t_rep=%.5f\n",
+	//	x, y, w, h, s, t, s_rep, t_rep);
+	
+	/* TODO: If texture is NonPowerOfTwo, then multiply the s_rep and t_rep values. */
+	glBegin(GL_QUADS);
+	glTexCoord2d(s, t);
+	glVertex2d(x, y);
+	glTexCoord2d(s+s_rep, t);
+	glVertex2d(x+w, y);
+	glTexCoord2d(s+s_rep, t+t_rep);
+	glVertex2d(x+w, y+h);
+	glTexCoord2d(s, t+t_rep);
+	glVertex2d(x, y+h);
+	glEnd();
+	Inline_Stack_Void;
+}

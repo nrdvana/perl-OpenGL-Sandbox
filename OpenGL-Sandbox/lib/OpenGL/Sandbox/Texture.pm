@@ -306,11 +306,18 @@ current texture.
 =cut
 
 sub render {
-	$_[0]->bind;
-	shift->_render(@_ == 1 && ref $_[0] eq 'HASH'? %{$_[0]} : @_);
+	# Render requires OpenGL 1.x API
+	eval 'require OpenGL::Sandbox::V1' or croak "render requires OpenGL::Sandbox::V1 (1.x API)";
+	# Now install methods for fast future calls
+	*render_bound= *OpenGL::Sandbox::V1::_texture_render;
+	*render= sub {
+		$_[0]->bind;
+		shift->render_bound(@_ == 1 && ref $_[0] eq 'HASH'? %{$_[0]} : @_);
+	};
+	goto $_[0]->can('render');
 }
 
-*render_bound= *_render;
+*render_bound= *render;
 
 =head1 CLASS FUNCTIONS
 

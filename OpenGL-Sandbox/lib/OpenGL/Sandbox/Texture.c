@@ -2,7 +2,8 @@
 #include <libavutil/avutil.h>
 #include <libavutil/pixfmt.h>
 #include <libswscale/swscale.h>
-#include "OpenGL_Sandbox.h"
+#define SCALAR_REF_DATA(obj) (SvROK(obj) && SvPOK(SvRV(obj))? (void*)SvPVX(SvRV(obj)) : (void*)0)
+#define SCALAR_REF_LEN(obj)  (SvROK(obj) && SvPOK(SvRV(obj))? SvCUR(SvRV(obj)) : 0)
 
 /* This gets called by Moo */
 int _build_tx_id(HV *self) {
@@ -71,7 +72,8 @@ SV *_fetch_if_defined(HV *self, const char *field, int len) {
 
 void _load_rgb_square(HV *self, SV *mmap, int is_bgr) {
 	SV *sv;
-	void *data= SCALAR_REF_DATA_OR_CROAK(mmap);
+	void *data= SCALAR_REF_DATA(mmap);
+	int len= SCALAR_REF_LEN(mmap);
 	const char *ver;
 	int major, minor;
 	SV *mipmap_p= _fetch_if_defined(self, "mipmap", 6);
@@ -79,7 +81,6 @@ void _load_rgb_square(HV *self, SV *mmap, int is_bgr) {
 	SV *wrap_t_p= _fetch_if_defined(self, "wrap_t", 6);
 	SV *min_filter_p= _fetch_if_defined(self, "min_filter", 10);
 	SV *mag_filter_p= _fetch_if_defined(self, "mag_filter", 10);
-	int len= SCALAR_REF_LEN(mmap);
 	int has_alpha= 0;
 	int dim= _dimension_from_filesize(len, &has_alpha);
 	int gl_fmt= is_bgr? ( has_alpha? GL_BGRA : GL_BGR )
@@ -92,6 +93,9 @@ void _load_rgb_square(HV *self, SV *mmap, int is_bgr) {
 		: !min_filter_p? 1
 		: SvIV(min_filter_p) == GL_NEAREST || SvIV(min_filter_p) == GL_LINEAR ? 0
 		: 1;
+	
+	if (!data || !len)
+		croak("Expected non-empty scalar-ref pixel buffer");
 	
 	ver= (const char *) glGetString(GL_VERSION);
 	if (!ver) croak("Can't get GL_VERSION");
@@ -161,7 +165,7 @@ int _round_up_pow2(long dim) {
 SV* _rescale_to_pow2_square(int width, int height, int has_alpha, int want_bgr, SV *sref) {
 	struct SwsContext *sws= NULL;
 	SV *ret= NULL;
-	void *data= SCALAR_REF_DATA_OR_CROAK(sref);
+	void *data= SCALAR_REF_DATA(sref);
 	int len= SCALAR_REF_LEN(sref);
 	int px_size= has_alpha? 4 : 3;
 	int dim= _round_up_pow2(width > height? width : height);
@@ -170,6 +174,8 @@ SV* _rescale_to_pow2_square(int width, int height, int has_alpha, int want_bgr, 
 	uint8_t *dst_planes[4]= { 0,0,0,0 };
 	int dst_stride[4]= { dim*px_size,0,0,0 };
 	
+	if (!data || !len)
+		croak("Expected non-empty scalar-ref pixel buffer");
 	if (width * height * px_size != len)
 		croak("Size of scalar ref disagrees with rectangle dimensions: %d * %d * %d != %d",
 			width, height, px_size, len);
@@ -202,97 +208,5 @@ void _bind_tx(HV *self, ...) {
 	if (Inline_Stack_Items > 1)
 		target= SvIV(Inline_Stack_Item(1));
 	glBindTexture(_lazy_build_tx_id(self), target);
-	Inline_Stack_Void;
-}
-
-void _render(HV *self, ...) {
-	SV *value, *w_sv= NULL, *h_sv= NULL, *def_w, *def_h;
-	double x= 0, y= 0, z= 0, s= 0, t= 0, s_rep= 1, t_rep= 1;
-	double w, h, scale= 1;
-	int i, center= 0;
-	const char *key;
-	
-	Inline_Stack_Vars;
-	if (!(Inline_Stack_Items & 1))
-		/* stack items includes $self, so an actual odd number is a logical even number */
-		croak("Odd number of parameters passed to ->render");
-
-	for (i= 1; i < Inline_Stack_Items-1; i+= 2) {
-		key= SvPV_nolen(Inline_Stack_Item(i));
-		value= Inline_Stack_Item(i+1);
-		if (!SvOK(value)) continue; /* ignore anything that isn't defined */
-		switch (*key) {
-		case 'x': if (!key[1]) x= SvNV(value);
-			else
-		case 'y': if (!key[1]) y= SvNV(value);
-			else
-		case 'z': if (!key[1]) z= SvNV(value);
-			else
-		case 'w': if (!key[1]) w_sv= value;
-			else
-		case 'h': if (!key[1]) h_sv= value;
-			else
-		case 't': if (!key[1]) t= SvNV(value);
-			else if (strcmp("t_rep", key) == 0) t_rep= SvNV(value);
-			else
-		case 's': if (!key[1]) s= SvNV(value);
-			else if (strcmp("s_rep", key) == 0) s_rep= SvNV(value);
-			else if (strcmp("scale", key) == 0) scale= SvNV(value);
-			else
-		case 'c': if (strcmp("center", key) == 0) center= SvTRUE(value);
-			else
-		default:
-			croak("Invalid key '%s' in call to render()", key);
-		}
-	}
-	/* width and height default to the src_width and src_height, or width, height.
-	 * but, if one one dimension given, then use those defaults as an aspect ratio to calculate the other */
-	if (w_sv && h_sv) {
-		w= SvNV(w_sv);
-		h= SvNV(h_sv);
-	}
-	else {
-		def_w= _fetch_if_defined(self, "src_width", 9);
-		if (!def_w) def_w= _fetch_if_defined(self, "width", 5);
-		if (!def_w) croak("No width defined on texture");
-		def_h= _fetch_if_defined(self, "src_height", 10);
-		if (!def_h) def_h= _fetch_if_defined(self, "height", 6);
-		if (!def_h) croak("No height defined on texture");
-		/* depending which we have, multiply by aspect ratio to calculate the other */
-		if (w_sv) {
-			w= SvNV(w_sv);
-			h= w * SvNV(def_h) / SvNV(def_w);
-		}
-		else if (h_sv) {
-			h= SvNV(h_sv);
-			w= h * SvNV(def_w) / SvNV(def_h);
-		}
-		else {
-			w= SvNV(def_w);
-			h= SvNV(def_h);
-		}
-	}
-	/* If scaled, adjust w,h */
-	w *= scale;
-	h *= scale;
-	/* If centered, then adjust the x and y */
-	if (center) {
-		x -= w * .5;
-		y -= h * .5;
-	}
-	//printf("Rendering texture: x=%.5f y=%.5f w=%.5f h=%.5f s=%.5f t=%.5f s_rep=%.5f t_rep=%.5f\n",
-	//	x, y, w, h, s, t, s_rep, t_rep);
-	
-	/* TODO: If texture is NonPowerOfTwo, then multiply the s_rep and t_rep values. */
-	glBegin(GL_QUADS);
-	glTexCoord2d(s, t);
-	glVertex2d(x, y);
-	glTexCoord2d(s+s_rep, t);
-	glVertex2d(x+w, y);
-	glTexCoord2d(s+s_rep, t+t_rep);
-	glVertex2d(x+w, y+h);
-	glTexCoord2d(s, t+t_rep);
-	glVertex2d(x, y+h);
-	glEnd();
 	Inline_Stack_Void;
 }
