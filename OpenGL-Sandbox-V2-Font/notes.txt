@@ -1,0 +1,2 @@
+Basis for new font API:
+https://learnopengl.com/In-Practice/Text-Rendering
