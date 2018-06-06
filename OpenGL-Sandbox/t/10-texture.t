@@ -4,15 +4,15 @@ use warnings;
 use FindBin;
 use Try::Tiny;
 use Test::More;
-use JSON;
-use X11::GLX::DWIM;
+use lib "$FindBin::Bin/lib";
 use Log::Any::Adapter 'TAP';
+use OpenGL::Sandbox qw/ make_context get_gl_errors /;
 
 use_ok( 'OpenGL::Sandbox::Texture' ) or BAIL_OUT;
 
-my $glx= X11::GLX::DWIM->new();
-$glx->target({ pixmap => { width => 128, height => 128 } });
-note 'GL Version '.$glx->glx_version;
+my $ctx= try { make_context(0) };
+plan skip_all => "Can't create an OpenGL context"
+	unless $ctx;
 
 # Create tmp dir for this script
 mkdir "$FindBin::Bin/tmp";
@@ -33,12 +33,12 @@ subtest load_rgb => sub {
 				close $img1 or die "close: $!";
 				# Load it as a texture
 				my $tx= OpenGL::Sandbox::Texture->new(filename => $fname)->load;
+				is_deeply( [get_gl_errors], [], 'no GL error' );
 				is( $tx->width, $dim, "width=$dim" );
 				is( $tx->height, $dim, "height=$dim" );
 				is( $tx->pow2_size, $dim, "pow2_size=$dim" );
 				ok( !$tx->mipmap, "no mipmaps" );
 				is( !!$tx->has_alpha, !!$alpha, "has_alpha=$alpha" );
-				is_deeply( $glx->get_gl_errors//{}, {}, 'no GL error' );
 			}
 		};
 	}
@@ -53,6 +53,7 @@ subtest load_png => sub {
 		my ($fname, $width, $height, $pow2, $has_alpha, $src_w, $src_h)= @$_;
 		subtest $fname => sub {
 			my $tx= OpenGL::Sandbox::Texture->new(filename => "$datadir/tex/$fname")->load;
+			is_deeply( [get_gl_errors], [], 'no GL error' );
 			is( $tx->width, $width, 'width' );
 			is( $tx->height, $height, 'height' );
 			is( $tx->pow2_size, $pow2, 'pow2_size' );
@@ -62,34 +63,9 @@ subtest load_png => sub {
 			
 			OpenGL::Sandbox::Texture::convert_png("$datadir/tex/$fname", "$tmp/$fname.rgb");
 			my $tx2= OpenGL::Sandbox::Texture->new(filename => "$tmp/$fname.rgb")->load;
+			is_deeply( [get_gl_errors], [], 'no GL error' );
 			is( $tx2->width, $tx->width, 'width after convert to rgb' );
-			is_deeply( $glx->get_gl_errors//{}, {}, 'no GL error' );
 		};
-	}
-};
-
-subtest render => sub {
-	my $tx1= OpenGL::Sandbox::Texture->new(filename => "$datadir/tex/8x8.png")->load;
-	my $tx2= OpenGL::Sandbox::Texture->new(filename => "$datadir/tex/14x7-rgba.png")->load;
-	my @tests= (
-		[ ],
-		[ center => 1 ],
-		[ x => 1.5 ],
-		[ y => 1.5 ],
-		[ z => 1.5 ],
-		[ w => 1, h => 1 ],
-		[ w => 1 ],
-		[ h => 1 ],
-		[ scale => 4 ],
-		[ s => .1 ],
-		[ t => .1 ],
-		[ s_rep => 5 ],
-		[ t_rep => 5 ],
-	);
-	# Can't actually check result, but just check for exceptions
-	for my $t (@tests) {
-		is( (try{ $tx1->render(@$t); '' } catch {$_}), '', 'render sq   '.JSON->new->canonical->encode($t) );
-		is( (try{ $tx2->render(@$t); '' } catch {$_}), '', 'render rect '.JSON->new->canonical->encode($t) );
 	}
 };
 

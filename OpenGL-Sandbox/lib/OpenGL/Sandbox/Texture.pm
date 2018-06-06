@@ -3,7 +3,10 @@ package OpenGL::Sandbox::Texture;
 use Moo;
 use Carp;
 use Try::Tiny;
-use OpenGL ();
+use OpenGL::Sandbox qw(
+	GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_TEXTURE_MAG_FILTER GL_TEXTURE_WRAP_S GL_TEXTURE_WRAP_T
+	glTexParameteri glBindTexture
+);
 use OpenGL::Sandbox::MMap;
 
 # ABSTRACT: Wrapper object for OpenGL texture
@@ -99,10 +102,10 @@ has height     => ( is => 'rwp' );
 has pow2_size  => ( is => 'rw' );
 has has_alpha  => ( is => 'rwp' );
 has mipmap     => ( is => 'rwp' );
-has min_filter => ( is => 'rw', trigger => sub { shift->_maybe_apply_gl_texparam(OpenGL::GL_TEXTURE_MIN_FILTER(), shift) } );
-has mag_filter => ( is => 'rw', trigger => sub { shift->_maybe_apply_gl_texparam(OpenGL::GL_TEXTURE_MAG_FILTER(), shift) } );
-has wrap_s     => ( is => 'rw', trigger => sub { shift->_maybe_apply_gl_texparam(OpenGL::GL_TEXTURE_WRAP_S(), shift) } );
-has wrap_t     => ( is => 'rw', trigger => sub { shift->_maybe_apply_gl_texparam(OpenGL::GL_TEXTURE_WRAP_T(), shift) } );
+has min_filter => ( is => 'rw', trigger => sub { shift->_maybe_apply_gl_texparam(GL_TEXTURE_MIN_FILTER, shift) } );
+has mag_filter => ( is => 'rw', trigger => sub { shift->_maybe_apply_gl_texparam(GL_TEXTURE_MAG_FILTER, shift) } );
+has wrap_s     => ( is => 'rw', trigger => sub { shift->_maybe_apply_gl_texparam(GL_TEXTURE_WRAP_S, shift) } );
+has wrap_t     => ( is => 'rw', trigger => sub { shift->_maybe_apply_gl_texparam(GL_TEXTURE_WRAP_T, shift) } );
 
 # Until loaded, changes to these parameters are just stored in the object.
 # After loading, changes need pushed to GL, which also requires binding the texture.
@@ -110,7 +113,7 @@ sub _maybe_apply_gl_texparam {
 	my ($self, $param, $val)= @_;
 	return unless $self->loaded;
 	$self->bind;
-	OpenGL::glTexParameteri(OpenGL::GL_TEXTURE_2D(), $param, $val);
+	glTexParameteri(GL_TEXTURE_2D, $param, $val);
 }
 
 =head1 METHODS
@@ -131,7 +134,7 @@ Returns C<$self> for convenient chaining.
 
 sub bind {
 	my ($self, $target)= @_;
-	OpenGL::glBindTexture($target // OpenGL::GL_TEXTURE_2D(), $self->tx_id);
+	glBindTexture($target // GL_TEXTURE_2D, $self->tx_id);
 	if (!$self->loaded && (defined $self->loader || defined $self->filename)) {
 		$self->load;
 	}

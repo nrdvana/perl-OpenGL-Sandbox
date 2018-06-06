@@ -6,7 +6,6 @@ use Carp;
 use File::Spec::Functions qw/ catdir rel2abs file_name_is_absolute canonpath /;
 use Log::Any '$log';
 use OpenGL::Sandbox::MMap;
-use OpenGL::Sandbox::Font;
 use OpenGL::Sandbox::Texture;
 use File::Find ();
 use Scalar::Util ();

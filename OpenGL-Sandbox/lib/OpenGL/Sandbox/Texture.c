@@ -1,9 +1,18 @@
 #include <GL/gl.h>
+#include <GL/glext.h>
 #include <libavutil/avutil.h>
 #include <libavutil/pixfmt.h>
 #include <libswscale/swscale.h>
+#if LIBAVUTIL_VERSION_MAJOR < 54
+#define AV_PIX_FMT_RGBA PIX_FMT_RGBA
+#define AV_PIX_FMT_RGB24 PIX_FMT_RGB24
+#define AV_PIX_FMT_BGRA PIX_FMT_BGRA
+#define AV_PIX_FMT_BGR24 PIX_FMT_BGR24
+#endif
 #define SCALAR_REF_DATA(obj) (SvROK(obj) && SvPOK(SvRV(obj))? (void*)SvPVX(SvRV(obj)) : (void*)0)
 #define SCALAR_REF_LEN(obj)  (SvROK(obj) && SvPOK(SvRV(obj))? SvCUR(SvRV(obj)) : 0)
+
+
 
 /* This gets called by Moo */
 int _build_tx_id(HV *self) {
@@ -97,17 +106,22 @@ void _load_rgb_square(HV *self, SV *mmap, int is_bgr) {
 	if (!data || !len)
 		croak("Expected non-empty scalar-ref pixel buffer");
 	
+	/* Ensure the OpenGL context is initialized */
+	//call_pv("OpenGL::Sandbox::_ensure_context", G_VOID | G_NOARGS | G_EVAL);
+	//if (SvTRUE(ERRSV))
+	//	croak(NULL);
+	
+	/* Mipmap strategy depends on version of GL.
+	   Supposedly this GetString is more compatible than GetInteger(GL_VERSION_MAJOR)
+	*/
 	ver= (const char *) glGetString(GL_VERSION);
-	if (!ver) croak("Can't get GL_VERSION");
+	if (!ver || sscanf(ver, "%d.%d", &major, &minor) != 2)
+		croak("Can't get GL_VERSION");
 	
 	/* Bind texture */
 	glBindTexture(GL_TEXTURE_2D, _lazy_build_tx_id(self));
 	
 	if (with_mipmaps) {
-		/* Mipmap strategy depends on version of GL.
-		   Supposedly this GetString is more compatible than GetInteger(GL_VERSION_MAJOR)
-		*/
-		sscanf(ver, "%d.%d", &major, &minor);
 		if (major < 3) {
 			glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_TRUE);
 			if (mag_filter_p)
@@ -116,7 +130,6 @@ void _load_rgb_square(HV *self, SV *mmap, int is_bgr) {
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, SvIV(min_filter_p));
 		}
 	} else {
-		warn("without mipmaps");
 		if (mag_filter_p)
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, SvIV(mag_filter_p));
 		/* this one needs overridden even if user didn't request it, because default uses mipmaps */
@@ -127,6 +140,7 @@ void _load_rgb_square(HV *self, SV *mmap, int is_bgr) {
 	}
 	glTexImage2D(GL_TEXTURE_2D, 0, gl_internal_fmt, dim, dim, 0, gl_fmt, GL_UNSIGNED_BYTE, data);
 	if (with_mipmaps && major >= 3) {
+		/* glEnable(GL_TEXTURE_2D); /* correct bug in ATI, accoridng to Khronos FAQ */
 		glGenerateMipmap(GL_TEXTURE_2D);
 		/* examples show setting these after mipmap generation.  Does it matter? */
 		if (mag_filter_p)
@@ -181,8 +195,8 @@ SV* _rescale_to_pow2_square(int width, int height, int has_alpha, int want_bgr, 
 			width, height, px_size, len);
 	
 	/* rescale to square */
-	sws= sws_getCachedContext(sws, width, height, has_alpha? PIX_FMT_RGBA : PIX_FMT_RGB24,
-		dim, dim, want_bgr? (has_alpha? PIX_FMT_BGRA : PIX_FMT_BGR24) : (has_alpha? PIX_FMT_RGBA : PIX_FMT_RGB24),
+	sws= sws_getCachedContext(sws, width, height, has_alpha? AV_PIX_FMT_RGBA : AV_PIX_FMT_RGB24,
+		dim, dim, want_bgr? (has_alpha? AV_PIX_FMT_BGRA : AV_PIX_FMT_BGR24) : (has_alpha? AV_PIX_FMT_RGBA : AV_PIX_FMT_RGB24),
 		SWS_BICUBIC, NULL, NULL, NULL);
 	if (!sws)
 		croak("can't initialize resize context");

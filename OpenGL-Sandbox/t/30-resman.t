@@ -23,9 +23,10 @@ $res->tex_config({
 	default => '8x8',
 });
 
-isa_ok( $res->font('default'), 'OpenGL::Sandbox::Font', 'load default font'  );
-is( $res->font('squada')->data, $res->font('default')->data, 'Empty is default' );
-is( $res->font('default')->ascender, 28, 'look up ascender' );
+# Can't run font tests without a separate font module
+# isa_ok( $res->font('default'), 'OpenGL::Sandbox::Font', 'load default font'  );
+# is( $res->font('squada')->data, $res->font('default')->data, 'Empty is default' );
+# is( $res->font('default')->ascender, 28, 'look up ascender' );
 
 is( $res->tex_default_fmt, 'bgr', 'default pixel format' );
 
