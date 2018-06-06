@@ -6,7 +6,6 @@ use Carp;
 use File::Spec::Functions qw/ catdir rel2abs file_name_is_absolute canonpath /;
 use Log::Any '$log';
 use OpenGL::Sandbox::MMap;
-use OpenGL::Sandbox::Texture;
 use File::Find ();
 use Scalar::Util ();
 
@@ -269,6 +268,11 @@ Dies if no matching file can be found, or if it wasn't able to process any match
 =cut
 
 sub load_texture {
+	require OpenGL::Sandbox::Texture;
+	*load_texture= *_load_texture;
+	goto $_[0]->can('load_texture');
+}
+sub _load_texture {
 	my ($self, $name, %options)= @_;
 	my $tex;
 	return $tex if $tex= $self->_texture_cache->{$name};

@@ -10,7 +10,7 @@ use OpenGL::Sandbox qw/ make_context get_gl_errors /;
 
 use_ok( 'OpenGL::Sandbox::Texture' ) or BAIL_OUT;
 
-my $ctx= try { make_context(0) };
+my $ctx= try { make_context() };
 plan skip_all => "Can't create an OpenGL context"
 	unless $ctx;
 

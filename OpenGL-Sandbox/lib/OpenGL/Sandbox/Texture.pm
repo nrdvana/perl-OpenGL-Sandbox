@@ -347,6 +347,8 @@ sub convert_png {
 # Pull in the C file and make sure it has all the C libs available
 use Inline
 	C => do { my $x= __FILE__; $x =~ s|\.pm|\.c|; Cwd::abs_path($x) },
+	NAME => __PACKAGE__,
+	(defined $OpenGL::Sandbox::VERSION? (VERSION => OpenGL::Sandbox->VERSION) : ()),
 	INC => '-I'.do{ my $x= __FILE__; $x =~ s|/[^/]+$|/|; Cwd::abs_path($x) }.' -I/usr/include/ffmpeg',
 	LIBS => '-lGL -lswscale',
 	CCFLAGSEX => '-Wall -g3 -Os';

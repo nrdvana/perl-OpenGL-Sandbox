@@ -12,7 +12,7 @@
 #define SCALAR_REF_DATA(obj) (SvROK(obj) && SvPOK(SvRV(obj))? (void*)SvPVX(SvRV(obj)) : (void*)0)
 #define SCALAR_REF_LEN(obj)  (SvROK(obj) && SvPOK(SvRV(obj))? SvCUR(SvRV(obj)) : 0)
 
-
+extern void glGenerateMipmap(int);
 
 /* This gets called by Moo */
 int _build_tx_id(HV *self) {
