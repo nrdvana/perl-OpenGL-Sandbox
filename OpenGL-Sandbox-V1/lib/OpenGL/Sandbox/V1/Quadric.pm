@@ -1,7 +1,6 @@
 package OpenGL::Sandbox::V1::Quadric;
-require OpenGL::Sandbox::V1; # automatically loads Quadric via XS
 
-__END__
+require OpenGL::Sandbox::V1; # automatically loads Quadric via XS
 
 # ABSTRACT - Rendering parameters for various geometric shapes
 
@@ -99,3 +98,4 @@ A solid disk would actually be generated with the L</cylinder> method.
 Plot a wedge of a disk around the Z axis.
 
 =cut
+__END__

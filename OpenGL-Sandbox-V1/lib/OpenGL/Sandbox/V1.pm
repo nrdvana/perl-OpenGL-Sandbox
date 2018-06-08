@@ -31,7 +31,7 @@ use Inline
 		NAME => __PACKAGE__,
 		VERSION => __PACKAGE__->VERSION
 	) : () ),
-	LIBS => '-lGL',
+	LIBS => '-lGL -lGLU',
 	CCFLAGSEX => '-Wall -g3 -Os';
 
 # ABSTRACT: Various OpenGL tools and utilities that depend on the OpenGL 1.x API
@@ -360,17 +360,17 @@ sub draw_axes_xy {
 		quads {
 			my $thick= $unit_size*0.05;
 			setcolor($colorX) if defined $colorX;
-			plot_xy undef,
+			plot_xy(undef,
 				-$range, -$thick, # X axis
 				 $range, -$thick,
 				 $range,  $thick,
-				-$range,  $thick;
+				-$range,  $thick);
 			setcolor($colorY) if defined $colorY;
-			plot_xy undef,
+			plot_xy(undef,
 				-$thick, -$range, # Y axis
 				-$thick,  $range,
 				 $thick,  $range,
-				 $thick, -$range;
+				 $thick, -$range);
 		};
 		$err= 0;
 	};
@@ -466,26 +466,26 @@ sub draw_boundbox {
 	setcolor($color_edge // '#77FF77');
 	line_strip {
 		# Edges of rectangle
-		plot_xy undef,
+		plot_xy(undef,
 			$x0, $y0,
 			$x1, $y0,
 			$x1, $y1,
 			$x0, $y1,
-			$x0, $y0;
+			$x0, $y0);
 	};
 	lines {
 		# Cross hairs of origin
 		setcolor($color_axes // '#FF777777');
-		plot_xy undef,
+		plot_xy(undef,
 			$x0, 0,  $x1, 0,
-			0, $y0,  0, $y1;
+			0, $y0,  0, $y1);
 		# Diagonals from origin to corners
 		setcolor($color_to_origin // '#77AAAA77');
-		plot_xy undef,
+		plot_xy(undef,
 			$x0, $y0,  0,0,
 			$x1, $y0,  0,0,
 			$x1, $y1,  0,0,
-			$x0, $y1,  0,0;
+			$x0, $y1,  0,0);
 	};
 	glPopAttrib();
 }

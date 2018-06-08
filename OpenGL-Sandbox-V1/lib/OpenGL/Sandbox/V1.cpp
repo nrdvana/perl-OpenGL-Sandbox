@@ -22,6 +22,7 @@ public:
 	/* Return 'this' for chaining convenience */
 	SV* draw_style(int style) {
 		Inline_Stack_Vars;
+		(void)items; /* silence arning */
 		gluQuadricDrawStyle(q, style);
 		return Inline_Stack_Item(0);
 	}
@@ -32,6 +33,7 @@ public:
 	
 	SV* normals(int normals) {
 		Inline_Stack_Vars;
+		(void)items; /* silence arning */
 		gluQuadricNormals(q, normals == 0? GLU_NONE : normals);
 		return Inline_Stack_Item(0);
 	}
@@ -41,6 +43,7 @@ public:
 	
 	SV* orientation(int orient) {
 		Inline_Stack_Vars;
+		(void)items; /* silence arning */
 		gluQuadricOrientation(q, orient);
 		return Inline_Stack_Item(0);
 	}
@@ -49,6 +52,7 @@ public:
 	
 	SV* texture(bool enabled) {
 		Inline_Stack_Vars;
+		(void)items; /* silence arning */
 		gluQuadricTexture(q, enabled? GLU_TRUE : GLU_FALSE);
 		return Inline_Stack_Item(0);
 	}
