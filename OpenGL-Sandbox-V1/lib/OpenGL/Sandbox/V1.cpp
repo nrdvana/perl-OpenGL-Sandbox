@@ -562,3 +562,14 @@ void _texture_render(HV *self, ...) {
 	glEnd();
 	Inline_Stack_Void;
 }
+
+void get_viewport_rect(...) {
+	Inline_Stack_Vars;
+	GLint rect[4];
+	int i;
+	glGetIntegerv(GL_VIEWPORT, rect);
+	Inline_Stack_Reset;
+	for (i=0; i < 4; i++)
+		Inline_Stack_Push(sv_2mortal(newSViv(rect[i])));
+	Inline_Stack_Done;
+}

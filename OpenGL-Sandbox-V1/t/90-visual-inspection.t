@@ -112,5 +112,13 @@ sub test_boundbox {
 	show { draw_boundbox( -.9, .3, .9, .9 ); };
 }
 
+subtest projection => \&test_projection;
+sub test_projection {
+	setup_projection(left => -11, right => 11, z => 2);
+	show { draw_boundbox( -10, -10, 10, 10 ) };
+	setup_projection(left => -11, right => 11, z => 2, aspect => .5);
+	show { draw_boundbox( -10, -10, 10, 10 ) };
+}
+
 undef $c;
 done_testing;

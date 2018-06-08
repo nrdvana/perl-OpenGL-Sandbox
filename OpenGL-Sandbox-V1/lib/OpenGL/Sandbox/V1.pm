@@ -9,17 +9,19 @@ use Try::Tiny;
 use Math::Trig;
 use Cwd;
 use OpenGL::Sandbox qw/
-	glLoadIdentity glPushAttrib glPopAttrib glEnable glDisable 
-	GL_CURRENT_BIT GL_ENABLE_BIT GL_TEXTURE_2D
+	glLoadIdentity glPushAttrib glPopAttrib glEnable glDisable glOrtho glFrustum glMatrixMode
+	glFrontFace glTranslated
+	GL_CURRENT_BIT GL_ENABLE_BIT GL_TEXTURE_2D GL_PROJECTION GL_CW GL_CCW GL_MODELVIEW
 /;
 our @EXPORT_OK= qw(
-	local_matrix load_identity scale trans trans_scale rotate mirror local_gl
+	local_matrix load_identity setup_projection scale trans trans_scale rotate mirror local_gl
 	lines line_strip quads quad_strip triangles triangle_strip triangle_fan
 	plot_xy plot_xyz plot_st_xy plot_st_xyz plot_norm_st_xyz plot_rect plot_rect3
 	cylinder sphere disk partial_disk
 	compile_list call_list 
 	setcolor color_parts color_mult
 	draw_axes_xy draw_axes_xyz draw_boundbox
+	get_viewport_rect
 );
 our %EXPORT_TAGS= (
 	all => \@EXPORT_OK,
@@ -40,9 +42,8 @@ use Inline
 
 This module is separated from OpenGL::Sandbox in order to keep the OpenGL API dependencies
 less tangled.  Everything specific to OpenGL 1.x that I would have otherwise included in
-OpenGL::Sandbox is located here, instead.  Loading this module causes all of those things
-to be available from the main OpenGL::Sandbox module.  The main OpenGL::Sandbox module can
-also automatically load this module using the import tag of C<:1.x>
+OpenGL::Sandbox is located here, instead.  The main OpenGL::Sandbox module can automatically
+load this module using the import tag of C<:V1> or C<:V1:all>.
 
 =head1 EXPORTABLE FUNCTIONS
 
@@ -51,6 +52,71 @@ also automatically load this module using the import tag of C<:1.x>
 =head3 load_identity
 
 Alias for glLoadIdentity
+
+=head3 setup_projection
+
+=cut
+
+sub setup_projection {
+	my %args= @_ == 1 && ref($_[0]) eq 'HASH'? %{ $_[0] } : @_;
+	my ($ortho, $l, $r, $t, $b, $near, $far, $x, $y, $z, $aspect, $mirror_x, $mirror_y)
+		= delete @args{qw/ ortho left right top bottom near far x y z aspect mirror_x mirror_y /};
+	croak "Unexpected arguments to setup_projection"
+		if keys %args;
+	my $have_w= defined $l && defined $r;
+	my $have_h= defined $t && defined $b;
+	unless ($have_h && $have_w) {
+		if (!$aspect or $aspect eq 'auto') {
+			my ($x, $y, $w, $h)= get_viewport_rect();
+			$aspect= $h / $h;
+		}
+		if (!$have_w) {
+			if (!$have_h) {
+				$t= (defined $b? -$b : 1) unless defined $t;
+				$b= -$t unless defined $b;
+			}
+			my $w= ($t - $b) * $aspect;
+			$r= (defined $l? $l + $w : $w / 2) unless defined $r;
+			$l= $r - $w unless defined $l;
+		}
+		else {
+			my $h= ($r - $l) / $aspect;
+			$t= (defined $b? $b + $h : $h / 2) unless defined $t;
+			$b= $t - $h unless defined $b;
+		}
+	}
+	($l, $r)= ($r, $l) if $mirror_x;
+	($t, $b)= ($b, $t) if $mirror_y;
+	$near= 1 unless defined $near;
+	$far= 1000 unless defined $far;
+	defined $_ or $_= 0
+		for ($x, $y, $z);
+	
+	# If Z is specified, then the left/right/top/bottom are interpreted to be the
+	# edges of the screen at this position.  Only matters for Frustum.
+	if ($z && !$ortho) {
+		my $scale= 1.0/$z;
+		$l *= $scale;
+		$r *= $scale;
+		$t *= $scale;
+		$b *= $scale;
+	}
+	
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	
+	#print "l=$l r=$r b=$b t=$t near=$near far=$far\n";
+	$ortho? glOrtho($l, $r, $b, $t, $near, $far)
+	      : glFrustum($l, $r, $b, $t, $near, $far);
+	
+	glTranslated(-$x, -$y, -$z)
+		if $x or $y or $z;
+	
+	# If mirror is in effect, need to tell OpenGL which way the camera is
+	glFrontFace(!$mirror_x eq !$mirror_y? GL_CCW : GL_CW);
+	glMatrixMode(GL_MODELVIEW);
+}
+
 
 =head3 local_matrix
 
