@@ -384,36 +384,46 @@ void _displaylist_call(SV *self, ...) {
 	Inline_Stack_Done;
 }
 
-static void _parse_color(SV *c, float *rgba);
+static void _parse_color(SV *c, double *rgba);
+/* would prefer this to be a function, but the Inline_Stack_* macros seem to get messed up
+   if you run them from a called function */
+#define _color_from_stack(dest) \
+	do { \
+		if (Inline_Stack_Items == 1) \
+			_parse_color(Inline_Stack_Item(0), dest); \
+		else if (Inline_Stack_Items == 3) { \
+			for (i= 0; i < 3; i++) \
+				dest[i]= SvNV(Inline_Stack_Item(i)); \
+			dest[i]= 1.0; \
+		} \
+		else if (Inline_Stack_Items == 4) { \
+			for (i= 0; i < 4; i++) \
+				dest[i]= SvNV(Inline_Stack_Item(i)); \
+		} \
+		else croak("Expected 1, 3, or 4 arguments"); \
+	} while (0)
 
 void setcolor(SV *c0, ...) {
 	Inline_Stack_Vars;
-	GLfloat components[4];
-	int i;
-	
-	if (Inline_Stack_Items == 1)
-		_parse_color(c0, components);
-	else if (Inline_Stack_Items == 3) {
-		for (i= 0; i < 3; i++)
-			components[i]= SvNV(Inline_Stack_Item(i));
-		components[i]= 1.0;
-	}
-	else if (Inline_Stack_Items == 4) {
-		for (i= 0; i < 4; i++)
-			components[i]= SvNV(Inline_Stack_Item(i));
-	}
-	else croak("Expected 1, 3, or 4 arguments to setcolor");
-	glColor4fv(components);
-	Inline_Stack_Void;
-}
-
-void extract_color(SV *c) {
-	Inline_Stack_Vars;
-	float components[4];
+	double components[4];
+	GLfloat components_f[4];
 	int i;
 	(void)items; /* silence warning */
 	
-	_parse_color(c, components);
+	_color_from_stack(components);
+	for (i= 0; i < 4; i++)
+		components_f[i]= components[i];
+	glColor4fv(components_f);
+	Inline_Stack_Void;
+}
+
+void color_parts(SV *c, ...) {
+	Inline_Stack_Vars;
+	double components[4];
+	int i;
+	(void)items; /* silence warning */
+	
+	_color_from_stack(components);
 	Inline_Stack_Reset;
 	for (i=0; i < 4; i++)
 		Inline_Stack_Push(sv_2mortal(newSVnv(components[i])));
@@ -422,7 +432,7 @@ void extract_color(SV *c) {
 
 void color_mult(SV *c0, SV *c1) {
 	Inline_Stack_Vars;
-	float components[8];
+	double components[8];
 	int i;
 	(void)items; /* silence warning */
 	
@@ -434,7 +444,7 @@ void color_mult(SV *c0, SV *c1) {
 	Inline_Stack_Done;
 }
 
-static void _parse_color(SV *c, float *rgba) {
+static void _parse_color(SV *c, double *rgba) {
 	SV **field_p;
 	int i, n;
 	unsigned hex_rgba[4];

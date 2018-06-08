@@ -15,6 +15,9 @@ use OpenGL::Sandbox qw(
 );
 use OpenGL::Sandbox::V1 ':all';
 
+$ENV{TEST_VISUAL}
+	or plan skip_all => "Set TEST_VISUAL=1 to run these tests";
+
 my $c= try { make_context; }
 	or plan skip_all => "Can't test without context";
 
@@ -23,6 +26,7 @@ $res->resource_root_dir(catdir($FindBin::Bin, 'data'));
 sub show(&) {
 	my ($code, $tname)= @_;
 	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+	load_identity;
 	$code->();
 	$c->swap_buffers;
 	sleep .5;
@@ -33,7 +37,7 @@ sub show(&) {
 sub spin(&) {
 	my ($code, $tname)= @_;
 	load_identity;
-	for (my $i= 0; $i < 300; $i++) {
+	for (my $i= 0; $i < 200; $i++) {
 		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 		local_matrix {
 			rotate $i*1, 1, 1, 0;
@@ -54,7 +58,7 @@ show {};
 glClearColor(0,0,1,1);
 show {};
 
-subtest textures => \&test_textures;
+#subtest textures => \&test_textures;
 sub test_textures {
 	# Render texture at 0,0
 	glEnable(GL_TEXTURE_2D);
@@ -88,7 +92,7 @@ sub test_textures {
 	};
 };
 
-subtest coordinate_sys => \&test_coordinate_sys;
+#subtest coordinate_sys => \&test_coordinate_sys;
 sub test_coordinate_sys {
 	# Render a coordinate system
 	spin {
@@ -100,6 +104,13 @@ sub test_coordinate_sys {
 		draw_axes_xyz;
 	};
 };
+
+subtest boundbox => \&test_boundbox;
+sub test_boundbox {
+	show { draw_boundbox( -.5, -.5, .5, .5 ); };
+	show { draw_boundbox( .3, .3, .9, .9 ); };
+	show { draw_boundbox( -.9, .3, .9, .9 ); };
+}
 
 undef $c;
 done_testing;

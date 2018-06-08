@@ -18,7 +18,7 @@ our @EXPORT_OK= qw(
 	plot_xy plot_xyz plot_st_xy plot_st_xyz plot_norm_st_xyz plot_rect plot_rect3
 	cylinder sphere disk partial_disk
 	compile_list call_list 
-	setcolor extract_color color_mult
+	setcolor color_parts color_mult
 	draw_axes_xy draw_axes_xyz draw_boundbox
 );
 our %EXPORT_TAGS= (
@@ -300,9 +300,9 @@ sub compile_list(&) { OpenGL::Sandbox::V1::DisplayList->new->compile(shift); }
 
 Various ways to specify a color for glSetColor4f.  If Alpha component is missing, it defaults to 1.0
 
-=head3 extract_color
+=head3 color_parts
 
-  my ($r, $g, $b, $a)= extract_color('#RRGGBBAA');
+  my ($r, $g, $b, $a)= color_parts('#RRGGBBAA');
 
 Convenience method that always returns 4 components of a color, given the same variety of
 formats as setcolor.
@@ -335,8 +335,8 @@ sub draw_axes_xy {
 	$range //= 1;
 	$unit_size //= 0.1;
 	$colorY //= $colorX;
-	$colorX //= '#77FF77';
-	$colorY //= '#7777FF';
+	$colorX //= '#FF7777';
+	$colorY //= '#77FF77';
 	my $whole_units= int($range / $unit_size);
 	my $remainder= $range - $whole_units * $unit_size;
 	glPushAttrib(GL_CURRENT_BIT | GL_ENABLE_BIT);
@@ -393,9 +393,9 @@ sub draw_axes_xyz {
 	$unit_size //= 0.1;
 	$colorY //= $colorX;
 	$colorZ //= $colorY;
-	$colorX //= '#77FF77';
-	$colorY //= '#7777FF';
-	$colorZ //= '#FF7777';
+	$colorX //= '#FF7777';
+	$colorY //= '#77FF77';
+	$colorZ //= '#7777FF';
 	my $whole_units= int($range / $unit_size);
 	my $remainder= $range - $whole_units * $unit_size;
 	glPushAttrib(GL_CURRENT_BIT | GL_ENABLE_BIT);
@@ -453,38 +453,35 @@ sub draw_axes_xyz {
 
   draw_boundbox( $x0, $y0, $x1, $y1, $color_edge, $color_to_origin );
 
-Draw lines around a rectangle, and also a line from each corner to the origin, and if the
-origin is within the rectangle, also a line parallel to X passing through origin and line
-parallel to Y passing through origin.
+Draw lines around a rectangle, and also a line from each corner to the origin, and the section
+of the X and Y axes that are within the bounds of the rectangle.
 This is useful for marking a 2D widget relative to the current coordinate system.
 
 =cut
 
 sub draw_boundbox {
-	my ($x0, $y0, $x1, $y1, $color_edge, $color_to_origin)= @_;
+	my ($x0, $y0, $x1, $y1, $color_edge, $color_to_origin, $color_axes)= @_;
 	glPushAttrib(GL_CURRENT_BIT | GL_ENABLE_BIT);
 	glDisable(GL_TEXTURE_2D);
-	setcolor($color_edge // [.5,1,.5,.5]);
+	setcolor($color_edge // '#77FF77');
 	line_strip {
 		# Edges of rectangle
-		plot_v2
+		plot_xy undef,
 			$x0, $y0,
-			$x0, $y1,
-			$x1, $y1,
 			$x1, $y0,
+			$x1, $y1,
+			$x0, $y1,
 			$x0, $y0;
 	};
 	lines {
 		# Cross hairs of origin
-		if ($x0 <= 0 && $x1 >= 0 && $y0 <= 0 && $y1 >= 0) {
-			setcolor($color_to_origin // [1,.5,.5,.5]);
-			plot_xy
-				$x0, 0,  $x1, 0,
-				0, $y0,  0, $y1;
-		}
+		setcolor($color_axes // '#FF777777');
+		plot_xy undef,
+			$x0, 0,  $x1, 0,
+			0, $y0,  0, $y1;
 		# Diagonals from origin to corners
-		setcolor($color_to_origin // [.7,.4,.4,.4]);
-		plot_xy
+		setcolor($color_to_origin // '#77AAAA77');
+		plot_xy undef,
 			$x0, $y0,  0,0,
 			$x1, $y0,  0,0,
 			$x1, $y1,  0,0,
