@@ -18,7 +18,8 @@ public:
 	{
 		void *data= SCALAR_REF_DATA(mmap);
 		int len= SCALAR_REF_LEN(mmap);
-		if (!data || !len) croak("Expected MMap or scalar ref to non-empty font data buffer")
+		if (!data || !len)
+			croak("Expected MMap or scalar ref to non-empty font data buffer");
 		
 		/* most common first */
 		if (strcmp(font_class, "FTTextureFont") == 0)
@@ -119,7 +120,7 @@ void FTFontWrapper::render(const char *text, ...) {
 				if (yalign > 0)
 					pos.Y(-font->Ascender() * yalign);
 				else
-					pos.Y(-font->Descender() * yalign);
+					pos.Y(font->Descender() * yalign);
 			}
 			else
 		case 'z': if (!key[1]) {

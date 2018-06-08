@@ -5,109 +5,107 @@ use FindBin;
 use File::Spec::Functions 'catdir';
 use Time::HiRes 'sleep';
 use Test::More;
+use Try::Tiny;
 use Log::Any::Adapter 'TAP';
-use X11::GLX::DWIM;
+use OpenGL::Sandbox qw/
+	make_context get_gl_errors $res :V1:all
+	glClear GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT glClearColor
+/;
 
-use_ok( 'OpenGL::Sandbox::ResMan' ) or BAIL_OUT;
+$ENV{TEST_VISUAL}
+	or plan skip_all => "Set TEST_VISUAL=1 to run these tests";
 
-my $glx= X11::GLX::DWIM->new();
-$glx->target({ window => { width => 256, height => 256 }}); # instantiate target
-$glx->apply_gl_projection(left => -128, right => 128, top => 128, bottom => -128, ortho => 1, z => 10);
-note 'GLX Version '.$glx->glx_version;
+my $c= try { make_context; }
+	or plan skip_all => "Can't test without context";
 
-my $res= OpenGL::Sandbox::ResMan->default_instance;
 $res->resource_root_dir(catdir($FindBin::Bin, 'data'));
 $res->font_config({
 	default => { filename => 'SquadaOne-Regular', face_size => 32 }
 });
-$res->tex_config({
-	default => '8x8',
-});
-
-# First frame seems to get lost, unless I sleep a bit
-$glx->display->flush_sync;
-sleep 1;
-
-OpenGL::glEnable(OpenGL::GL_TEXTURE_2D);
-OpenGL::glEnable(OpenGL::GL_BLEND);
-OpenGL::glBlendFunc(OpenGL::GL_SRC_ALPHA, OpenGL::GL_ONE);
 
 sub show(&) {
-	$glx->begin_frame;
-	shift->();
-	$glx->end_frame;
-	$glx->display->flush_sync;
+	my ($code, $tname)= @_;
+	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+	load_identity;
+	$code->();
+	$c->swap_buffers;
 	sleep .5;
+	my @e= get_gl_errors;
+	ok( !@e, $tname )
+		or diag "GL Errors: ".join(', ', @e);
+}
+sub spin(&) {
+	my ($code, $tname)= @_;
+	load_identity;
+	for (my $i= 0; $i < 200; $i++) {
+		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+		local_matrix {
+			rotate $i*1, 1, 1, 0;
+			rotate $i*2, 0, 0, 1;
+			$code->();
+		};
+		$c->swap_buffers;
+	}
+	my @e= get_gl_errors;
+	ok( !@e, $tname )
+		or diag "GL Errors: ".join(', ', @e);
 }
 
+# First frame seems to get lost, unless I sleep a bit
+show {};
+
+# Fonts render at 1 unit per point, by default, so just change projection matrix instead
+# of scaling modelview in every test.
+setup_projection(left => -200, right => 200, z => 10);
+
 # Render solid blue, as a test
-OpenGL::glClearColor(0,0,1,1);
-show {
-};
-# Render texture at 0,0
-OpenGL::glClearColor(0,0,0,1);
-$res->tex('8x8')->wrap_s(OpenGL::GL_CLAMP);
-$res->tex('8x8')->wrap_t(OpenGL::GL_CLAMP);
-show {
-	$res->tex('8x8')->render;
-};
+glClearColor(0,0,1,1);
+show {};
 
-# Render scaled to 1/4 the window
+my $font= $res->font('default');
+# Render with baseline at origin
 show {
-	$res->tex('8x8')->render(scale => 16);
-};
-
-# Render full-window, ignoring native texture dimensions
-show {
-	$res->tex('8x8')->render(w => 256, center => 1);
-};
-
-# Render repeated 9 times across the window
-$res->tex('8x8')->wrap_s(OpenGL::GL_REPEAT);
-$res->tex('8x8')->wrap_t(OpenGL::GL_REPEAT);
-show {
-	$res->tex('8x8')->render(w => 256, center => 1, s_rep => 9, t_rep => 9);
-};
-
-# Render with alpha blending, and with non-square aspect texture
-OpenGL::glClearColor(0,.2,.3,1);
-show {
-	$res->tex('14x7-rgba')->render(w => 256, center => 1, s_rep => 9, t_rep => 9);
+	draw_boundbox( -50, $font->descender, 50, $font->ascender );
+	$font->render("Left Baseline");
 };
 
 # Render with baseline at origin
 show {
-	$res->font('default')->render("Left Baseline");
-};
-
-# Render with baseline at origin
-show {
-	$res->font('default')->render("Right Baseline", xalign => 1);
+	draw_boundbox( -50, $font->descender, 50, $font->ascender );
+	$font->render("Right Baseline", xalign => 1);
 };
 
 show {
-	$res->font('default')->render('Center Baseline', xalign => .5);
+	draw_boundbox( -50, $font->descender, 50, $font->ascender );
+	$font->render('Center Baseline', xalign => .5);
 };
 show {
-	$res->font('default')->render("Top", xalign => .5, yalign => 1);
+	draw_boundbox( -50, $font->descender, 50, $font->ascender );
+	$font->render("Top", xalign => .5, yalign => 1);
 };
 show {
-	$res->font('default')->render("Center", xalign => .5, yalign => .5);
+	draw_boundbox( -50, $font->descender, 50, $font->ascender );
+	$font->render("Center", xalign => .5, yalign => .5);
 };
 show {
-	$res->font('default')->render("Bottom", xalign => .5, yalign => -1);
+	draw_boundbox( -50, $font->descender, 50, $font->ascender );
+	$font->render("Bottom", xalign => .5, yalign => -1);
 };
 show {
-	$res->font('default')->render('Width=200', width => 200, xalign => .5);
+	draw_boundbox( -50, $font->descender, 50, $font->ascender );
+	$font->render('Width=200', width => 200, xalign => .5);
 };
 show {
-	$res->font('default')->render('Scale 3x', xalign => .5, scale => 3);
+	draw_boundbox( -50, $font->descender, 50, $font->ascender );
+	$font->render('Scale 3x', xalign => .5, scale => 3);
 };
 show {
-	$res->font('default')->render('Width=200,Height=50', width => 200, height => 50, xalign => .5);
+	draw_boundbox( -50, $font->descender, 50, $font->ascender );
+	$font->render('Width=200,Height=50', width => 200, height => 50, xalign => .5);
 };
 show {
-	$res->font('default')->render("monospaced", x => -100, monospace => 15);
+	draw_boundbox( -50, $font->descender, 50, $font->ascender );
+	$font->render("monospaced", x => -100, monospace => 15);
 };
 
 done_testing;

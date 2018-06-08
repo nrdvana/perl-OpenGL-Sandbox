@@ -158,6 +158,10 @@ sub render {
 }
 
 use Inline CPP => do { my $x= __FILE__; $x =~ s/\.pm$/\.cpp/; $x },
+	(defined $OpenGL::Sandbox::V1::FTGLFont::VERSION? (
+		NAME => __PACKAGE__,
+		VERSION => __PACKAGE__->VERSION
+	) : () ),
 	INC => '-I/usr/include/FTGL -I/usr/include/freetype2 -I'
 	       .do{ my $x= __FILE__; $x =~ s|/[^/]+$||; Cwd::abs_path($x) },
 	LIBS => '-lfreetype -lftgl';
