@@ -1,4 +1,71 @@
 #include <GL/gl.h>
+#include <GL/glu.h>
+
+/* Reading from perl hashes is annoying.  This simplified function only returns
+ * non-NULL if the key existed and the value was defined.
+ */
+static SV *_fetch_if_defined(HV *self, const char *field, int len) {
+	SV **field_p= hv_fetch(self, field, len, 0);
+	return (field_p && *field_p && SvOK(*field_p)) ? *field_p : NULL;
+}
+
+class Quadric {
+	GLUquadric *q;
+public:
+	Quadric(): q(NULL) {
+		q= gluNewQuadric();
+	}
+	~Quadric() {
+		if (q) gluDeleteQuadric(q), q= NULL;
+	}
+	
+	/* Return 'this' for chaining convenience */
+	SV* draw_style(int style) {
+		Inline_Stack_Vars;
+		gluQuadricDrawStyle(q, style);
+		return Inline_Stack_Item(0);
+	}
+	SV* draw_fill()       { return draw_style(GLU_FILL); }
+	SV* draw_line()       { return draw_style(GLU_LINE); }
+	SV* draw_silhouette() { return draw_style(GLU_SILHOUETTE); }
+	SV* draw_point()      { return draw_style(GLU_POINT); }
+	
+	SV* normals(int normals) {
+		Inline_Stack_Vars;
+		gluQuadricNormals(q, normals == 0? GLU_NONE : normals);
+		return Inline_Stack_Item(0);
+	}
+	SV* no_normals()     { return normals(GLU_NONE); }
+	SV* flat_normals()   { return normals(GLU_FLAT); }
+	SV* smooth_normals() { return normals(GLU_SMOOTH); }
+	
+	SV* orientation(int orient) {
+		Inline_Stack_Vars;
+		gluQuadricOrientation(q, orient);
+		return Inline_Stack_Item(0);
+	}
+	SV* inside()  { return orientation(GLU_INSIDE); }
+	SV* outside() { return orientation(GLU_OUTSIDE); }
+	
+	SV* texture(bool enabled) {
+		Inline_Stack_Vars;
+		gluQuadricTexture(q, enabled? GLU_TRUE : GLU_FALSE);
+		return Inline_Stack_Item(0);
+	}
+	
+	void cylinder(double base, double top, double height, int slices, int stacks) {
+		gluCylinder(q, base, top, height, slices, stacks);
+	}
+	void sphere(double radius, int slices, int stacks) {
+		gluSphere(q, radius, slices, stacks);
+	}
+	void disk(double inner, double outer, int slices, int stacks) {
+		gluDisk(q, inner, outer, slices, stacks);
+	}
+	void partial_disk(double inner, double outer, int slices, int loops, double start, double sweep) {
+		gluPartialDisk(q, inner, outer, slices, loops, start, sweep);
+	}
+};
 
 void _local_gl(SV *code) {
 	GLint orig_depth, depth;
@@ -55,7 +122,7 @@ void trans(double x, double y, ...) {
 	Inline_Stack_Void;
 }
 
-void trans_scale(double x, double y, double z, double sx, ...) {
+void trans_scale(double x, double y, double z, double scale_x, ...) {
 	double scale_y, scale_z;
 	Inline_Stack_Vars;
 	glTranslated(x, y, z);
@@ -220,6 +287,41 @@ void plot_norm_st_xyz(SV *begin_mode, ...) {
 	Inline_Stack_Void;
 }
 
+/* Draw a line between (x0,y0,z0) and (x1,y1,z1), and then step by (dX,dY,dZ) and do it again, count times */
+void plot_stripe(double x0, double y0, double z0, double x1, double y1, double z1, double dX, double dY, double dZ, int count) {
+	for (int i=0; i < count; i++) {
+		glVertex3d(x0, y0, z0); glVertex3d(x1, y1, z1);
+		x0+= dX; y0+= dY; z0+= dZ;
+		x1+= dX; y1+= dY; z1+= dZ;
+	}
+}
+
+void plot_rect(double x0, double y0, double x1, double y1) {
+	glVertex2d(x0, y0); glVertex2d(x1, y0);
+	glVertex2d(x1, y1); glVertex2d(x0, y1);
+}
+
+void plot_rect3(double x0, double y0, double z0, double x1, double y1, double z1) {
+	/* XY plane at z1 */
+	glVertex3d(x0, y0, z1); glVertex3d(x1, y0, z1);
+	glVertex3d(x1, y1, z1); glVertex3d(x0, y1, z1);
+	/* XY plane at z0 */
+	glVertex3d(x1, y0, z0); glVertex3d(x0, y0, z0);
+	glVertex3d(x0, y1, z0); glVertex3d(x1, y1, z0);
+	/* YZ plane at x0 */
+	glVertex3d(x0, y0, z0); glVertex3d(x0, y0, z1);
+	glVertex3d(x0, y1, z1); glVertex3d(x0, y1, z0);
+	/* YZ plane at x1 */
+	glVertex3d(x1, y0, z0); glVertex3d(x1, y0, z0);
+	glVertex3d(x1, y1, z0); glVertex3d(x1, y1, z1);
+	/* XZ plane at y0 */
+	glVertex3d(x0, y0, z0); glVertex3d(x1, y0, z0);
+	glVertex3d(x1, y0, z0); glVertex3d(x0, y0, z1);
+	/* XZ plane at y1 */
+	glVertex3d(x0, y1, z1); glVertex3d(x1, y1, z1);
+	glVertex3d(x1, y1, z0); glVertex3d(x0, y1, z0);
+}
+
 void _setcolor(SV *thing, ...) {
 	Inline_Stack_Vars;
 	unsigned c;
@@ -259,6 +361,7 @@ SV * _displaylist_compile(SV *self, SV *code) {
 
 void _displaylist_call(SV *self, ...) {
 	Inline_Stack_Vars;
+	int list_id;
 	SV *code;
 	if (SvROK(self) && SvIOK(SvRV(self)))
 		glCallList(SvIV(SvRV(self)));
@@ -283,28 +386,34 @@ void _displaylist_call(SV *self, ...) {
 
 static void _parse_color(SV *c, float *rgba);
 
-void setcolor(SV *c0) {
+void setcolor(SV *c0, ...) {
+	Inline_Stack_Vars;
 	GLfloat components[4];
-	if (Inline_Stack_Vars == 1)
-		parse_color(c0, components);
-	else if (Inline_Stack_Vars == 3) {
+	int i;
+	
+	if (Inline_Stack_Items == 1)
+		_parse_color(c0, components);
+	else if (Inline_Stack_Items == 3) {
 		for (i= 0; i < 3; i++)
 			components[i]= SvNV(Inline_Stack_Item(i));
 		components[i]= 1.0;
 	}
-	else if (Inline_Stack_Vars == 4) {
+	else if (Inline_Stack_Items == 4) {
 		for (i= 0; i < 4; i++)
 			components[i]= SvNV(Inline_Stack_Item(i));
 	}
 	else croak("Expected 1, 3, or 4 arguments to setcolor");
 	glColor4fv(components);
+	Inline_Stack_Void;
 }
 
 void extract_color(SV *c) {
 	Inline_Stack_Vars;
 	float components[4];
 	int i;
-	parse_color(c, components);
+	(void)items; /* silence warning */
+	
+	_parse_color(c, components);
 	Inline_Stack_Reset;
 	for (i=0; i < 4; i++)
 		Inline_Stack_Push(sv_2mortal(newSVnv(components[i])));
@@ -315,45 +424,47 @@ void color_mult(SV *c0, SV *c1) {
 	Inline_Stack_Vars;
 	float components[8];
 	int i;
-	parse_color(c0, components);
-	parse_color(c1, components+4);
+	(void)items; /* silence warning */
+	
+	_parse_color(c0, components);
+	_parse_color(c1, components+4);
 	Inline_Stack_Reset;
 	for (i=0; i < 4; i++)
 		Inline_Stack_Push(sv_2mortal(newSVnv(components[i] * components[i+4])));
 	Inline_Stack_Done;
 }
 
-static void parse_color(SV *c, float *rgba) {
+static void _parse_color(SV *c, float *rgba) {
 	SV **field_p;
 	int i, n;
 	unsigned hex_rgba[4];
 	if (!SvOK(c)) {
-		*rgba[0]= *rgba[1]= *rgba[2]= 0;
-		*rgba[3]= 1;
+		rgba[0]= rgba[1]= rgba[2]= 0;
+		rgba[3]= 1;
 	}
-	else if (SvROK(c) && SvTYPE(c) == SVt_PVAV) {
+	else if (SvROK(c) && SvTYPE(SvRV(c)) == SVt_PVAV) {
 		for (i=0; i < 4; i++) {
-			field_p= av_fetch((SV*) SvRV(c), i, 0);
+			field_p= av_fetch((AV*) SvRV(c), i, 0);
 			rgba[i]= (field_p && *field_p && SvOK(*field_p))? SvNV(*field_p) : 0;
 		}
 	}
 	else {
-		n= sscanf(SvPV(c), "#%2x%2x%2x%2x", hex_rgba+0, hex_rgba+1, hex_rgba+2, hex_rgba+3);
-		if (n < 3) croak("Not a valid color: %s", SvPV(c));
-		if (n < 4) ad= 0xFF;
+		n= sscanf(SvPV_nolen(c), "#%2x%2x%2x%2x", hex_rgba+0, hex_rgba+1, hex_rgba+2, hex_rgba+3);
+		if (n < 3) croak("Not a valid color: %s", SvPV_nolen(c));
+		if (n < 4) hex_rgba[3]= 0xFF;
 		for (i=0; i < 4; i++)
 			rgba[i]= hex_rgba[i] / 255.0;
 	}
 }
 
 void _texture_render(HV *self, ...) {
+	Inline_Stack_Vars;
 	SV *value, *w_sv= NULL, *h_sv= NULL, *def_w, *def_h;
 	double x= 0, y= 0, z= 0, s= 0, t= 0, s_rep= 1, t_rep= 1;
 	double w, h, scale= 1;
 	int i, center= 0;
 	const char *key;
 	
-	Inline_Stack_Vars;
 	if (!(Inline_Stack_Items & 1))
 		/* stack items includes $self, so an actual odd number is a logical even number */
 		croak("Odd number of parameters passed to ->render");
@@ -421,19 +532,19 @@ void _texture_render(HV *self, ...) {
 		x -= w * .5;
 		y -= h * .5;
 	}
-	//printf("Rendering texture: x=%.5f y=%.5f w=%.5f h=%.5f s=%.5f t=%.5f s_rep=%.5f t_rep=%.5f\n",
+	//fprintf(stderr, "Rendering texture: x=%.5f y=%.5f w=%.5f h=%.5f s=%.5f t=%.5f s_rep=%.5f t_rep=%.5f\n",
 	//	x, y, w, h, s, t, s_rep, t_rep);
 	
 	/* TODO: If texture is NonPowerOfTwo, then multiply the s_rep and t_rep values. */
 	glBegin(GL_QUADS);
 	glTexCoord2d(s, t);
-	glVertex2d(x, y);
+	glVertex3d(x, y, z);
 	glTexCoord2d(s+s_rep, t);
-	glVertex2d(x+w, y);
+	glVertex3d(x+w, y, z);
 	glTexCoord2d(s+s_rep, t+t_rep);
-	glVertex2d(x+w, y+h);
+	glVertex3d(x+w, y+h, z);
 	glTexCoord2d(s, t+t_rep);
-	glVertex2d(x, y+h);
+	glVertex3d(x, y+h, z);
 	glEnd();
 	Inline_Stack_Void;
 }
