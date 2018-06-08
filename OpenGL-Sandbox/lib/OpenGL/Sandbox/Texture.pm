@@ -312,6 +312,7 @@ sub render {
 	# Render requires OpenGL 1.x API
 	eval 'require OpenGL::Sandbox::V1' or croak "render requires OpenGL::Sandbox::V1 (1.x API)";
 	# Now install methods for fast future calls
+	no warnings 'redefine';
 	*render_bound= *OpenGL::Sandbox::V1::_texture_render;
 	*render= sub {
 		$_[0]->bind;
@@ -347,8 +348,10 @@ sub convert_png {
 # Pull in the C file and make sure it has all the C libs available
 use Inline
 	C => do { my $x= __FILE__; $x =~ s|\.pm|\.c|; Cwd::abs_path($x) },
-	NAME => __PACKAGE__,
-	(defined $OpenGL::Sandbox::VERSION? (VERSION => OpenGL::Sandbox->VERSION) : ()),
+	(defined $OpenGL::Sandbox::Texture::VERSION? (
+		NAME => __PACKAGE__,
+		VERSION => __PACKAGE__->VERSION
+	) : () ),
 	INC => '-I'.do{ my $x= __FILE__; $x =~ s|/[^/]+$|/|; Cwd::abs_path($x) }.' -I/usr/include/ffmpeg',
 	LIBS => '-lGL -lswscale',
 	CCFLAGSEX => '-Wall -g3 -Os';

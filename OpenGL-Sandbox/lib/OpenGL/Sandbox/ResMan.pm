@@ -187,6 +187,7 @@ have changed.
 sub load_font {
 	eval 'require OpenGL::Sandbox::V1::FTGLFont'
 		or croak "Font support requires module L<OpenGL::Sandbox::V1::FTGLFont>, and OpenGL 1.x";
+	no warnings 'redefine';
 	*load_font= *_load_font;
 	goto $_[0]->can('load_font');
 }
@@ -269,6 +270,7 @@ Dies if no matching file can be found, or if it wasn't able to process any match
 
 sub load_texture {
 	require OpenGL::Sandbox::Texture;
+	no warnings 'redefine';
 	*load_texture= *_load_texture;
 	goto $_[0]->can('load_texture');
 }

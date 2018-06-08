@@ -27,10 +27,10 @@ require OpenGL::Sandbox::ResMan;
 
 =head2 GL_$CONSTANT, gl$Function
 
-This module can export OpenGL constants and functions, selecting them out of either OpenGL or
-OpenGL::Modern.   When exported by name, constants will be exported as true perl constants.
+This module can export OpenGL constants and functions, selecting them out of either L<OpenGL> or
+L<OpenGL::Modern>.   When exported by name, constants will be exported as true perl constants.
 However, the full selection of GL constants and functions is *not* available directly from this
-module's namespace.  i.e. OpenGL::Sandbox::GL_TRUE() does not work.
+module's namespace.  i.e. C<< OpenGL::Sandbox::GL_TRUE() >> does not work.
 
 =head2 $res
 
@@ -48,28 +48,19 @@ Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->font >>
 Note that you need to install L<OpenGL::Sandbox::V1::FTGLFont> in order to get font support,
 currently.  Other font providers might be added later.
 
-=head2 :1.x
+=cut
 
-Exports everything from L<OpenGL::Sandbox::V1> (which must be installed separately).
+sub tex  { OpenGL::Sandbox::ResMan->default_instance->tex(@_) }
+sub font { OpenGL::Sandbox::ResMan->default_instance->font(@_) }
+
+=head2 :V1:all
+
+Exports ':all' from L<OpenGL::Sandbox::V1> (which must be installed separately).
 This module contains many "sugar" functions to make the GL 1.x API more friendly.
 
-C<:2.x>, C<:3.x>, etc will likewise import everything from packages named
-C<OpenGL::SandBox::$_> (which do not currently exist, but could be authored
-in the future)
-
-=head2 make_context
-
-Pick the lightest smallest module that can get a window set up for rendering.
-This tries: L<X11::GLX>, L<OpenGL::GLFW>, and L<SDLx::App> in that order.
-It assumes you don't have any desire to receive user input and just want to render some stuff.
-If you do actually have a preference, you should just invoke that package yourself.
-
-Always returns an object whose scope controls the lifecycle of the window, and that object
-always has a C<swap_buffers> method.
-
-=head2 get_gl_errors
-
-Returns the symbolic names of any pending OpenGL errors, as a list.
+C<:V2:all>, C<:V3:all>, etc will likewise import everything from packages named
+C<OpenGL::SandBox::V$_> which do not currently exist, but could be authored
+in the future.
 
 =cut
 
@@ -87,9 +78,11 @@ sub import {
 			*{$caller.'::res'}= \$res;
 			splice(@_, $_, 1);
 		}
-		elsif ($arg =~ /^:(\d).x$/) {
+		elsif ($arg =~ /^:V(\d)(:.*)?$/) {
 			my $mod= "OpenGL::Sandbox::V$1";
-			eval "package $caller; use $mod ':all'; 1"
+			my $imports= $2;
+			$imports =~ s/:/ :/g;
+			eval "package $caller; use $mod qw/ $imports /; 1"
 				or croak "Can't load $mod (note that this must be installed separately)\n  $@";
 			splice(@_, $_, 1);
 		}
@@ -112,8 +105,17 @@ sub import {
 	goto \&Exporter::import;
 }
 
-sub tex  { OpenGL::Sandbox::ResMan->default_instance->tex(@_) }
-sub font { OpenGL::Sandbox::ResMan->default_instance->font(@_) }
+=head2 make_context
+
+Pick the lightest smallest module that can get a window set up for rendering.
+This tries: L<X11::GLX>, L<OpenGL::GLFW>, and L<SDLx::App> in that order.
+It assumes you don't have any desire to receive user input and just want to render some stuff.
+If you do actually have a preference, you should just invoke that package yourself.
+
+Always returns an object whose scope controls the lifecycle of the window, and that object
+always has a C<swap_buffers> method.
+
+=cut
 
 sub make_context {
 	my (%opts)= @_;
@@ -148,6 +150,12 @@ sub make_context {
 	}
 }
 
+=head2 get_gl_errors
+
+Returns the symbolic names of any pending OpenGL errors, as a list.
+
+=cut
+
 our %_gl_err_msg;
 BEGIN {
 	%_gl_err_msg= map { eval { $OpenGLModule->can($_)->() => $_ } } qw(
@@ -171,3 +179,66 @@ sub get_gl_errors {
 }
 
 1;
+
+__END__
+
+=head1 INSTALLING
+
+Getting this module collection installed is abnormally difficult.  This is a "selfish module"
+that I wrote primarily for me, but published in case it might be useful to someone else. My
+other more altruistic modules aim for high compatibility, but this one just unapologetically
+depends on lots of specific things.
+
+For the core module, you need:
+
+=over
+
+=item *
+
+Perl 5.14 or higher
+
+=item *
+
+libGL, and headers
+
+=item *
+
+LibAV libraries libswscale, libavutil, and headers, for the feature that automatically rescales textures
+
+=item *
+
+L<Image::PNG>, for the feature that automatically loads PNG.
+
+=item *
+
+L<File::Map>, for efficiently memory-mapping resource files
+
+=item *
+
+L<Inline::C>, including a local C compiler
+
+=back
+
+For the "V1" module (L<OpenGL::Sandbox::V1>) you will additionally need
+
+=over
+
+=item *
+
+libGLU and headers
+
+=item *
+
+Inline::CPP, including a local C++ compiler
+
+=back
+
+For the "FTGLFont" module (L<OpenGL::Sandbox::V1::FTGLFont>) you will additionally need
+
+=over
+
+=item *
+
+libftgl, and libfreetype2, and headers
+
+=back
