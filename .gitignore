@@ -1,3 +1,6 @@
-_Inline/
-t/tmp/
-.build/
+*/_Inline/
+*/t/tmp/
+*/.build/
+/OpenGL-Sandbox/OpenGL-Sandbox-*
+/OpenGL-Sandbox-V1/OpenGL-Sandbox-V1-*
+/OpenGL-Sandbox-V1-FTGLFont/OpenGL-Sandbox-V1-FTGLFont-*
