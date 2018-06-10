@@ -152,8 +152,9 @@ always has a C<swap_buffers> method.
 sub make_context {
 	my (%opts)= @_;
 	# Try X11 first, because lightest weight
-	my $provider= $ENV{OPENGL_SANDBOX_CONTEXT_PROVIDER}
-		// eval 'require X11::GLX::DWIM; 1;' ? 'X11::GLX::DWIM'
+	my $provider= $ENV{OPENGL_SANDBOX_CONTEXT_PROVIDER};
+	$provider //=
+		eval 'require X11::GLX::DWIM; 1;' ? 'X11::GLX::DWIM'
 		: eval 'require SDLx::App; 1;' ? 'SDLx::App'
 		: croak "make_context needs one of X11::GLX or SDL to be installed";
 	if ($provider eq 'X11::GLX' || $provider eq 'X11::GLX::DWIM') {
@@ -172,12 +173,11 @@ sub make_context {
 	# TODO: Else try GLFW
 	# Else try SDL
 	elsif ($provider eq 'SDL' || $provider eq 'SDLx::App') {
-		require SDLx::App;
-		my $sdl= SDLx::App->new(
+		my $sdl_subclass= _init_sdl_wrapper();
+		my $sdl= $sdl_subclass->new(
 			title  => $opts{title} // 'OpenGL',
 			width  => $opts{width} // 400,
 			height => $opts{height} // 400,
-			depth  => 32,
 			opengl => 1,
 		);
 		$log->infof("Loaded SDLx::App %s, OpenGL version %s\n", $sdl->VERSION, glGetString(GL_VERSION));
@@ -186,6 +186,21 @@ sub make_context {
 	else {
 		die "Unhandled context provider $provider";
 	}
+}
+
+sub _init_sdl_wrapper {
+	# Hack together a subclass of SDLx::App, but without alerting CPAN to its presence
+	# and without introducing it to the perl namespace unless SDLx::App exists.
+	unless (OpenGL::Sandbox::SDLx::App->VERSION) {
+		require SDLx::App;
+		no warnings 'once';
+		$OpenGL::Sandbox::SDLx::App::VERSION= __PACKAGE__->VERSION;
+		push @OpenGL::Sandbox::SDLx::App::ISA, 'SDLx::App';
+		*OpenGL::Sandbox::SDLx::App::swap_buffers= sub {
+			shift->sync;
+		};
+	}
+	return 'OpenGL::Sandbox::SDLx::App';
 }
 
 =head2 get_gl_errors
@@ -245,7 +260,7 @@ LibAV libraries libswscale, libavutil, and headers, for the feature that automat
 
 =item *
 
-L<Image::PNG>, for the feature that automatically loads PNG.
+L<Image::PNG::Libpng>, for the feature that automatically loads PNG.
 
 =item *
 

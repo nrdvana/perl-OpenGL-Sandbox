@@ -7,11 +7,10 @@ use Test::More;
 use lib "$FindBin::Bin/lib";
 use Log::Any::Adapter 'TAP';
 use OpenGL::Sandbox qw/ make_context get_gl_errors /;
+use OpenGL::Sandbox::Texture;
 
-use_ok( 'OpenGL::Sandbox::Texture' ) or BAIL_OUT;
-
-my $ctx= try { make_context() };
-plan skip_all => "Can't create an OpenGL context"
+my $ctx= eval { make_context() };
+plan skip_all => "Can't create an OpenGL context: $@"
 	unless $ctx;
 
 # Create tmp dir for this script
@@ -22,7 +21,8 @@ $tmp =~ s/\.t$// or die "can't calc temp dir";
 
 my $datadir= "$FindBin::Bin/data";
 
-subtest load_rgb => sub {
+subtest load_rgb => \&test_load_rgb;
+sub test_load_rgb {
 	for my $dim (1, 2, 4, 16, 32, 64, 128) {
 		subtest "dim=$dim" => sub {
 			for my $alpha (0, 1) {
@@ -44,7 +44,8 @@ subtest load_rgb => sub {
 	}
 };
 
-subtest load_png => sub {
+subtest load_png => \&test_load_png;
+sub test_load_png {
 	my @tests= (
 		[ '8x8.png', 8, 8, 8, 0, 8, 8 ],
 		[ '14x7-rgba.png', 16, 16, 16, 1, 14, 7 ]
@@ -67,6 +68,6 @@ subtest load_png => sub {
 			is( $tx2->width, $tx->width, 'width after convert to rgb' );
 		};
 	}
-};
+}
 
 done_testing;
