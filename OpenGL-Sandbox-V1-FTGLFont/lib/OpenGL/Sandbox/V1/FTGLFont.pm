@@ -23,12 +23,14 @@ This module is based on L<Inline::CPP>, so it requires a C++ compiler in order t
 
 =head2 type
 
-The C++ font class to use.  Currently must be C<'FTTextureFont'>
+The C++ font class to use.  FTGL implements fonts in several different ways, such as
+texture-of-glyphs, texture-of-string, 3D model, 2D model, etc.  These are represented by
+various C++ classes.  The module Inline::CPP cannot currently parse the external class
+definitions of FTGL, so each FTGL class must be wrapped by code in the C++ portion of this
+module.
 
-FTGL implements fonts in several different ways, such as texture-of-glyphs, texture-of-string,
-3D model, 2D model, etc.  These are represented by various C++ classes.  The module Inline::CPP
-cannot currently parse the external class definitions of FTGL, so each FTGL class must be
-wrapped by code in the C++ portion of this module.
+Currently must be one of C<'FTTextureFont'>, C<'FTExtrudeFont'>, C<'FTPolygonFont'>,
+C<'FTPixmapFont'>, C<'FTOutlineFont'>, C<'FTBufferFont'>, or C<'FTBitmapFont'>.
 
 =head2 data
 
@@ -41,8 +43,9 @@ The name this data was loaded from, for reference purposes only.
 
 =head2 face_size
 
-The pixel size of the rendering of the font into a texture.  Also determines the scale for all
-the other measurements.
+When using textured fonts, this is roughly the pixel/texel size of the glyphs that will be
+rendered into the texture.  When using geometric fonts (i.e. polygon-based) this will be the
+OpenGL coordinate space scale of the font.
 
 =head2 ascender
 
@@ -128,7 +131,7 @@ In other words,
 =item C<monospace>
 
 Ignore the spacing of the font face and always use this value to advance between glyphs.
-This number is in font units. (and if you don't specify a C<scale>, also OpenGL model units)
+This number is in the same units as font_face.  This value is affected by C<scale> (below).
 
 =item C<scale>
 
