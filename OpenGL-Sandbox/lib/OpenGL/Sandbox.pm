@@ -8,11 +8,22 @@ use Exporter;
 use Carp;
 use Log::Any '$log';
 # Choose OpenGL::Modern if available, else fall back to OpenGL.
+# But use the one configured in the environment.  But yet don't blindly
+# load modules from environment either.
 our $OpenGLModule;
 BEGIN {
-	$OpenGLModule= eval 'require OpenGL::Modern; 1'? 'OpenGL::Modern'
+	$OpenGLModule //= do {
+		my $fromenv= $ENV{OPENGL_SANDBOX_OPENGLMODULE} // '';
+		# Don't blindly require module from environment...
+		# Any other value, and the user must require it themself (such as perl -M)
+		eval "require $fromenv" if $fromenv eq 'OpenGL' || $fromenv eq 'OpenGL::Modern';
+		$fromenv? $fromenv
+		: eval 'require OpenGL::Modern; 1'? 'OpenGL::Modern'
 		: eval 'require OpenGL; 1'? 'OpenGL'
 		: croak "Can't load either OpenGL::Modern or OpenGL.  Please install one.";
+	};
+	
+	# If this succeeds, assume it is safe to eval this package name later
 	$OpenGLModule->import(qw/
 		glGetString glGetError
 		GL_VERSION
@@ -69,7 +80,9 @@ our %EXPORT_TAGS= ( all => \@EXPORT_OK );
 
 sub import {
 	my $caller= caller;
-	my @normal;
+	my $class= $_[0];
+	my @gl_const;
+	my @gl_fn;
 	for (reverse 1..$#_) {
 		my $arg= $_[$_];
 		if ($arg eq '$res') {
@@ -87,28 +100,47 @@ sub import {
 			splice(@_, $_, 1);
 		}
 		elsif ($arg =~ /^GL_/) {
-			my $const= __PACKAGE__->can($arg) // do {
-				my $value= $OpenGLModule->$arg;
-				constant->import($arg => $value);
-				__PACKAGE__->can($arg);
-			};
-			no strict 'refs';
-			*{ $caller . '::' . $arg }= $const;
+			push @gl_const, $arg;
 			splice(@_, $_, 1);
 		}
 		elsif ($arg =~ /^gl[a-zA-Z]/) {
-			no strict 'refs';
-			*{ $caller . '::' . $arg }= $OpenGLModule->can($arg) // die "No $arg in $OpenGLModule";
+			push @gl_fn, $arg;
 			splice(@_, $_, 1);
 		}
 	}
+	if (@gl_const) {
+		$class->_import_gl_constants_into($caller, @gl_const);
+	}
+	if (@gl_fn) {
+		eval "package $caller; $OpenGLModule->import(\@gl_fn); 1" or die $@;
+	}
+	# Let the real Exporter module handle anything remaining in @_
 	goto \&Exporter::import;
+}
+
+sub _import_gl_constants_into {
+	my ($class, $into, @names)= @_;
+	# First, import into this module, then import into caller.  This resolves an
+	# inefficiency in traditional OpenGL module where it optimizes imports for
+	# import speed rather than runtime speed.  We want constants to actually be
+	# perl constants.
+	my @need_import_const= grep !$class->can($_), @names;
+	$OpenGLModule->import(@need_import_const);
+	# Now for each constant we imported, undefine it then pass it to the constant module
+	no strict 'refs';
+	for (@need_import_const) {
+		my $val= $class->can($_)->();
+		undef *$_;
+		constant->import($_ => $val);
+	}
+	# Now import them all into caller
+	*{ $into . '::' . $_ }= $class->can($_) for @names;
 }
 
 =head2 make_context
 
 Pick the lightest smallest module that can get a window set up for rendering.
-This tries: L<X11::GLX>, L<OpenGL::GLFW>, and L<SDLx::App> in that order.
+This tries: L<X11::GLX>, and L<SDLx::App> in that order.
 It assumes you don't have any desire to receive user input and just want to render some stuff.
 If you do actually have a preference, you should just invoke that package yourself.
 
@@ -120,7 +152,12 @@ always has a C<swap_buffers> method.
 sub make_context {
 	my (%opts)= @_;
 	# Try X11 first, because lightest weight
-	if (eval 'require X11::GLX::DWIM; 1') {
+	my $provider= $ENV{OPENGL_SANDBOX_CONTEXT_PROVIDER}
+		// eval 'require X11::GLX::DWIM; 1;' ? 'X11::GLX::DWIM'
+		: eval 'require SDLx::App; 1;' ? 'SDLx::App'
+		: croak "make_context needs one of X11::GLX or SDL to be installed";
+	if ($provider eq 'X11::GLX' || $provider eq 'X11::GLX::DWIM') {
+		require X11::GLX::DWIM;
 		my $glx= X11::GLX::DWIM->new();
 		my $visible= $opts{visible} // 1;
 		if ($visible) {
@@ -134,7 +171,8 @@ sub make_context {
 	}
 	# TODO: Else try GLFW
 	# Else try SDL
-	elsif (eval 'require SDLx::App; 1') {
+	elsif ($provider eq 'SDL' || $provider eq 'SDLx::App') {
+		require SDLx::App;
 		my $sdl= SDLx::App->new(
 			title  => $opts{title} // 'OpenGL',
 			width  => $opts{width} // 400,
@@ -146,7 +184,7 @@ sub make_context {
 		return $sdl;
 	}
 	else {
-		die "Tests require one of X11::GLX or SDL to be installed.";
+		die "Unhandled context provider $provider";
 	}
 }
 
@@ -158,7 +196,7 @@ Returns the symbolic names of any pending OpenGL errors, as a list.
 
 our %_gl_err_msg;
 BEGIN {
-	%_gl_err_msg= map { eval { $OpenGLModule->can($_)->() => $_ } } qw(
+	%_gl_err_msg= map { my $v= eval "$OpenGLModule->import('$_'); $_()"; defined $v? ($v => $_) : () } qw(
 		GL_INVALID_ENUM
 		GL_INVALID_VALUE
 		GL_INVALID_OPERATION
@@ -242,3 +280,7 @@ For the "FTGLFont" module (L<OpenGL::Sandbox::V1::FTGLFont>) you will additional
 libftgl, and libfreetype2, and headers
 
 =back
+
+You probably also want a module to open a GL context to see things in.  This module is aware
+of L<X11::GLX> and L<SDL>, but you can use anything you like since the GL context
+is global.
