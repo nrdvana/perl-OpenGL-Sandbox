@@ -151,20 +151,46 @@ always has a C<swap_buffers> method.
 
 sub make_context {
 	my (%opts)= @_;
+	# Check for geometry specification on command line
+	my ($geom_spec, $w,$h,$l,$t);
+	for (0..$#ARGV) {
+		if ($ARGV[$_] =~ /^--?geometry(?:=(.*))?/) {
+			$geom_spec= $1 // $ARGV[$_+1];
+			last;
+		}
+	}
+	# Also check environment variable
+	$geom_spec //= $ENV{OPENGL_SANDBOX_GEOMETRY};
+	if (defined $geom_spec
+		&& (($w, $h, $l, $t)= ($geom_spec =~ /^(\d+)x(\d+)([-+]\d+)?([-+]\d+)?/))
+	) {
+		$opts{width} //= $w;
+		$opts{height} //= $h;
+		$opts{x} //= $l if defined $l;
+		$opts{y} //= $t if defined $t;
+	}
 	# Try X11 first, because lightest weight
 	my $provider= $ENV{OPENGL_SANDBOX_CONTEXT_PROVIDER};
 	$provider //=
-		eval 'require X11::GLX::DWIM; 1;' ? 'X11::GLX::DWIM'
-		: eval 'require SDLx::App; 1;' ? 'SDLx::App'
+		eval('require X11::GLX::DWIM; 1;') ? 'X11::GLX::DWIM'
+		: eval('require SDLx::App; 1;') ? 'SDLx::App'
 		: croak "make_context needs one of X11::GLX or SDL to be installed";
 	if ($provider eq 'X11::GLX' || $provider eq 'X11::GLX::DWIM') {
 		require X11::GLX::DWIM;
 		my $glx= X11::GLX::DWIM->new();
 		my $visible= $opts{visible} // 1;
 		if ($visible) {
-			$glx->target({ window => { width => $opts{width} // 400, height => $opts{height} // 400 }});
+			$glx->target({ window => {
+				x => $opts{x} // 0,
+				y => $opts{y} // 0,
+				width => $opts{width} // 400,
+				height => $opts{height} // 400
+			}});
 		} else {
-			$glx->target({ pixmap => { width => $opts{width} // 256, height => $opts{height} // 256 }});
+			$glx->target({ pixmap => {
+				width => $opts{width} // 256,
+				height => $opts{height} // 256
+			}});
 		}
 		$log->infof("Loaded X11::GLX::DWIM %s, target '%s', GLX Version %s, OpenGL version %s\n",
 			$glx->VERSION, $visible? 'window':'pixmap', $glx->glx_version, glGetString(GL_VERSION));
@@ -174,6 +200,9 @@ sub make_context {
 	# Else try SDL
 	elsif ($provider eq 'SDL' || $provider eq 'SDLx::App') {
 		my $sdl_subclass= _init_sdl_wrapper();
+		# This is the only option I know of for SDL to set initial window placement
+		local $ENV{SDL_VIDEO_WINDOW_POS}= ($opts{x}//0).','.($opts{y}//0)
+			if defined $opts{x} || defined $opts{y};
 		my $sdl= $sdl_subclass->new(
 			title  => $opts{title} // 'OpenGL',
 			width  => $opts{width} // 400,
@@ -183,6 +212,7 @@ sub make_context {
 		$log->infof("Loaded SDLx::App %s, OpenGL version %s\n", $sdl->VERSION, glGetString(GL_VERSION));
 		return $sdl;
 	}
+	# TODO: else try Prima
 	else {
 		die "Unhandled context provider $provider";
 	}
