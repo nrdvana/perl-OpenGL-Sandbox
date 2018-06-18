@@ -16,7 +16,7 @@ use OpenGL::Sandbox qw/
 our @EXPORT_OK= qw(
 	local_matrix load_identity setup_projection scale trans trans_scale rotate mirror local_gl
 	lines line_strip quads quad_strip triangles triangle_strip triangle_fan
-	plot_xy plot_xyz plot_st_xy plot_st_xyz plot_norm_st_xyz plot_rect plot_rect3
+	vertex plot_xy plot_xyz plot_st_xy plot_st_xyz plot_norm_st_xyz plot_rect plot_rect3
 	cylinder sphere disk partial_disk
 	compile_list call_list 
 	setcolor color_parts color_mult
@@ -222,6 +222,14 @@ sub quad_strip(&) { goto &_quad_strip }
 sub triangles(&) { goto &_triangles }
 sub triangle_strip(&) { goto &_triangle_strip }
 sub triangle_fan(&) { goto &_triangle_fan }
+
+=head3 vertex
+
+  vertex $x, $y;
+  vertex $x, $y, $z;
+  vertex $x, $y, $z, $w;
+
+Call one of glVertex${N} based on number of arguments.
 
 =head3 plot_xy
 

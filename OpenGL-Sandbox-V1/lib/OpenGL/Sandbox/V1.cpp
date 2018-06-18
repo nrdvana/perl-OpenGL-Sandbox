@@ -227,6 +227,17 @@ void _line_strip(SV *code) {
 	if (SvTRUE(ERRSV)) croak(NULL);
 }
 
+void vertex(double x, double y, ...) {
+	Inline_Stack_Vars;
+	switch (Inline_Stack_Items) {
+	case 4: glVertex4d( x, y, SvNV(Inline_Stack_Item(2)), SvNV(Inline_Stack_Item(3)) ); break;
+	case 3: glVertex3d( x, y, SvNV(Inline_Stack_Item(2)) ); break;
+	case 2: glVertex2d( x, y ); break;
+	default: croak("Too many arguments for vertex(): %d", Inline_Stack_Items);
+	}
+	Inline_Stack_Void;
+}
+
 void plot_xy(SV *begin_mode, ...) {
 	Inline_Stack_Vars;
 	int i, n= Inline_Stack_Items;
