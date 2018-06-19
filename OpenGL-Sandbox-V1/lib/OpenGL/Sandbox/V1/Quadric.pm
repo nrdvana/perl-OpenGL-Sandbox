@@ -82,14 +82,14 @@ Plot a sphere around the origin with specified dimensions.
 
   $q->cyliner($base, $top, $height, $slices, $stacks);
 
-Plot a cylinder along the Z axis with the specified dimensions.
+Plot a hollow cylinder (without ends) along the Z axis with the specified dimensions.
 
 =head2 disk
 
-  $q->disk($inner, $outer, $slices, $stacks);
+  $q->disk($inner, $outer, $slices, $loops);
 
-"disk" is slightly misleading; it is a cylinder with a hole through the center.
-A solid disk would actually be generated with the L</cylinder> method.
+Plot a flat circle around the Z axis along the XY plane.  Nonzero inner radius
+"subtracts" a circle from the center.
 
 =head2 partial_disk
 

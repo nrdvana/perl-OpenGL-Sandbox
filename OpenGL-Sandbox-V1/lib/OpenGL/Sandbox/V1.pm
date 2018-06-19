@@ -122,7 +122,7 @@ sub setup_projection {
 
   local_matrix { ... };
 
-Wrap a block of code with glPushmatrix/glPopMatrix.  This wrapper also checks the matrix stack
+Wrap a block of code with glPushMatrix/glPopMatrix.  This wrapper also checks the matrix stack
 depth before and after the call, warns if they don't match, and performs any missing
 glPopMatrix calls.
 
@@ -145,7 +145,7 @@ Scale all axes (one argument), the x and y axes (2 arguments), or a normal call 
   trans $x, $y;
   trans $x, $y, $z;
 
-Translate along x,y or x,y,z axes.  Calls either glTranslate2f or glTranslate3f.
+Translate by x,y or x,y,z.  C<$z> defaults to 0 if not supplied.
 
 =head3 trans_scale
 
@@ -153,7 +153,7 @@ Translate along x,y or x,y,z axes.  Calls either glTranslate2f or glTranslate3f.
   trans_scale $x, $y, $x, $sx, $sy; # $sz=1
   trans_scale $x, $y, $x, $sx, $sy, $sz;
 
-Combination of glTranslate, then glScale.
+Combination of L</trans> then L</scale>.
 
 =head3 rotate
 
@@ -187,11 +187,17 @@ sub local_gl(&) { goto &_local_gl }
 
 =head3 lines
 
-  lines { ... };  # wraps code with glBegin(GL_LINES); ... glEnd();
+  lines { ... };
+
+Wraps code with C<glBegin(GL_LINES);> ... C<glEnd();>, and also temporarily disables
+C<GL_TEXTURE_2D>.
 
 =head3 line_strip
 
-  line_strip { ... };  # wraps code with glBegin(GL_LINE_STRIP); ... glEnd();
+  line_strip { ... };
+
+Wraps code with C<glBegin(GL_LINE_STRIP);> ... C<glEnd();>, and also temporarily disables
+C<GL_TEXTURE_2D>.
 
 =head3 quads
 
@@ -397,8 +403,8 @@ Multiply each component of color1 by that component of color2.
 Renders the X and Y axis as lines from C<-$range> to C<+$range>, with a thinner lines
 making a grid of C<$unit_size> squares on the X/Y plane.
 
-$range defaults to C<1>.  C<$unit_size> defaults to C<0.1>.  C<$color> defaults to the current
-color.
+$range defaults to C<1>.  C<$unit_size> defaults to C<0.1>.  C<$color> defaults to Red for the
+X axis and Green for the Y axis.
 
 Automatically disables textures for this operation.
 
