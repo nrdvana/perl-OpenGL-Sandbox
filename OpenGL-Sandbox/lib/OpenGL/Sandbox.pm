@@ -139,13 +139,51 @@ sub _import_gl_constants_into {
 
 =head2 make_context
 
+  my $context= make_context( %opts );
+
 Pick the lightest smallest module that can get a window set up for rendering.
-This tries: L<X11::GLX>, and L<SDLx::App> in that order.
+This tries: L<X11::GLX>, and L<SDLx::App> in that order.  You can override the detection
+with environment variable C<OPENGL_SANDBOX_CONTEXT_PROVIDER>.
 It assumes you don't have any desire to receive user input and just want to render some stuff.
 If you do actually have a preference, you should just invoke that package yourself.
 
 Always returns an object whose scope controls the lifecycle of the window, and that object
 always has a C<swap_buffers> method.
+
+This attempts to automatically pick up the window geometry, either from a "--geometry=" option
+or from the environment variable C<OPENGL_SANDBOX_GEOMETRY>.  The Geometry value is in X11
+notation of C<"${WIDTH}x${HEIGHT}+$X+$Y" except that negative C<X>,C<Y> (from right edge) are
+not supported.
+
+Not all options have been implemented for each source, but the list of possibilities is:
+
+=over
+
+=item x, y, width, height
+
+Set the placement and dimensions of the created window.
+
+=item visible
+
+Defaults to true, but if false, attempts to create an off-screen GL context.
+
+=item fullscreen
+
+Attempts to create a full-screen context.
+
+=item noframe
+
+Attempts to create a window without window border decorations.
+
+=item title
+
+Window title
+
+=back
+
+Note that if you're using Classic OpenGL (V1) you also need to set up the projection matrix
+to something more useful than the defaults before rendering anything.
+See L<OpenGL::Sandbox::V1/setup_projection>.
 
 =cut
 
@@ -200,14 +238,24 @@ sub make_context {
 	# Else try SDL
 	elsif ($provider eq 'SDL' || $provider eq 'SDLx::App') {
 		my $sdl_subclass= _init_sdl_wrapper();
+		# TODO: Figure out best way to create invisible SDL window
+		if (defined $opts{visible} && !$opts{visible}) {
+			$opts{x}= -100;
+			$opts{width}= $opts{height}= 1;
+		}
 		# This is the only option I know of for SDL to set initial window placement
 		local $ENV{SDL_VIDEO_WINDOW_POS}= ($opts{x}//0).','.($opts{y}//0)
 			if defined $opts{x} || defined $opts{y};
+		my $flags= 0;
+		$flags |= SDL::SDL_NOFRAME() if $opts{noframe};
+		$flags |= SDL::SDL_FULLSCREEN() if $opts{fullscreen};
 		my $sdl= $sdl_subclass->new(
 			title  => $opts{title} // 'OpenGL',
-			width  => $opts{width} // 400,
-			height => $opts{height} // 400,
+			(defined $opts{width}?  ( width  => $opts{width} ) : ()),
+			(defined $opts{height}? ( height => $opts{height} ) : ()),
+			($flags?                ( flags => (SDL::SDL_ANYFORMAT() | $flags) ) : ()),
 			opengl => 1,
+			exit_on_quit => 1,
 		);
 		$log->infof("Loaded SDLx::App %s, OpenGL version %s\n", $sdl->VERSION, glGetString(GL_VERSION));
 		return $sdl;
