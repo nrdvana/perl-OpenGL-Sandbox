@@ -55,6 +55,65 @@ Alias for glLoadIdentity
 
 =head3 setup_projection
 
+The default OpenGL context projects with a lower-left of (-1,-1) and upper-right of (1,1),
+with near and far clipping planes of (-1 .. 1).  This isn't terribly useful.
+
+  setup_projection( %opts )
+
+This function assists with setting up a coordinate system (either glOrtho or glFrustum) where
+the aspect ratio of the screen is preserved, and the Z coordinate is pre-translated to
+something in front of the near clipping plane.
+
+That last bit is hard to describe, but consider that you want a 3D frustum where the left edge
+of the screen is C<(-10,0,0)> and right edge of the screen is C<(10,0,0)>, and the top is at
+something that matches the aspect ration (like say, C<(0,.6,0)>) and near clipping
+plane is at C<z = -10>.  For that, simply call
+
+  setup_projection( left => -10, right => 10, near => 1, z => 11 );
+
+(near must be greater than zero, and 1 is a good choice.  So set C<Z = Near + 10>).
+If you had tried the similar
+
+  glFrustum(-10, 10, -.6, .6, 1, 1000);
+  glTranslate(0,0,-10);
+
+the left and right edges wouldn't be where you wanted after the call to glTranslate.  This
+method corrects for that.
+
+Options:
+
+=over
+
+=item C<left>, C<right>, C<top>, C<bottom>
+
+The edges of the screen at the near clipping plane.  Missing values will be calculated from
+the aspect ratio of the viewport.  (and viewport defaults to same dimensions as screen)
+
+=item C<near>, C<far>
+
+The near and far clipping plane.  The near clipping plane is the pre-translation value passed
+to glOrtho or glFrustum.
+
+=item C<ortho>
+
+If true, calls glOrtho.  Else calls glFrustum.
+
+=item C<x>, C<y>, C<z>
+
+Coordinates of the desired origin, after setting up the ortho/frustum.
+
+=item C<apect>
+
+Override the aspect ratio used to calculate default width/height.
+
+=item C<mirror_x>, C<mirror_y>
+
+Set these (boolean) to flip the orientation of that axis.  If only one axis is flipped, then
+this also updates the value of glFrontFace to GL_CW.  Else it sets the value of glFrontFace to
+GL_CCW (the default).
+
+=back
+
 =cut
 
 sub setup_projection {
