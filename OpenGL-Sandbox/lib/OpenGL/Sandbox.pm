@@ -152,7 +152,7 @@ always has a C<swap_buffers> method.
 
 This attempts to automatically pick up the window geometry, either from a "--geometry=" option
 or from the environment variable C<OPENGL_SANDBOX_GEOMETRY>.  The Geometry value is in X11
-notation of C<"${WIDTH}x${HEIGHT}+$X+$Y" except that negative C<X>,C<Y> (from right edge) are
+notation of C<"${WIDTH}x${HEIGHT}+$X+$Y"> except that negative C<X>,C<Y> (from right edge) are
 not supported.
 
 Not all options have been implemented for each source, but the list of possibilities is:
