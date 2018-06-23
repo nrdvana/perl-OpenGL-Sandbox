@@ -104,16 +104,15 @@ sub import {
 			splice(@_, $_, 1);
 		}
 		elsif ($arg =~ /^gl[a-zA-Z]/) {
-			push @gl_fn, $arg;
-			splice(@_, $_, 1);
+			# Let local methods in this package override external ones
+			unless ($class->can($arg)) {
+				push @gl_fn, $arg;
+				splice(@_, $_, 1);
+			}
 		}
 	}
-	if (@gl_const) {
-		$class->_import_gl_constants_into($caller, @gl_const);
-	}
-	if (@gl_fn) {
-		eval "package $caller; $OpenGLModule->import(\@gl_fn); 1" or die $@;
-	}
+	$class->_import_gl_constants_into($caller, @gl_const) if @gl_const;
+	$class->_import_gl_functions_into($caller, @gl_fn) if @gl_fn;
 	# Let the real Exporter module handle anything remaining in @_
 	goto \&Exporter::import;
 }
@@ -135,6 +134,11 @@ sub _import_gl_constants_into {
 	}
 	# Now import them all into caller
 	*{ $into . '::' . $_ }= $class->can($_) for @names;
+}
+
+sub _import_gl_functions_into {
+	my ($class, $into, @names)= @_;
+	eval "package $into; $OpenGLModule->import(\@names); 1" or die $@;
 }
 
 =head2 make_context
