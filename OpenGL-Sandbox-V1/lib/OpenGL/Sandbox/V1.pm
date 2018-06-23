@@ -84,15 +84,18 @@ Options:
 
 =over
 
-=item C<left>, C<right>, C<top>, C<bottom>
+=item C<left>, C<right>, C<top>, C<bottom>, C<width>, C<height>
 
 The edges of the screen at the near clipping plane.  Missing values will be calculated from
-the aspect ratio of the viewport.  (and viewport defaults to same dimensions as screen)
+others (such as C<left> from C<width> and C<right>) and as a last resort, the aspect ratio of
+the viewport.  (and viewport defaults to same dimensions as screen)  If nothing is given,
+it starts with a bottom of -1 and top of 1 and the rest from viewport aspect ratio.
 
 =item C<near>, C<far>
 
 The near and far clipping plane.  The near clipping plane is the pre-translation value passed
-to glOrtho or glFrustum.
+to glOrtho or glFrustum.  The default C<far> is 1000.  The default C<near> is 1 for furstum
+and -1 for ortho.
 
 =item C<ortho>
 
@@ -109,8 +112,8 @@ Override the aspect ratio used to calculate default width/height.
 =item C<mirror_x>, C<mirror_y>
 
 Set these (boolean) to flip the orientation of that axis.  If only one axis is flipped, then
-this also updates the value of glFrontFace to GL_CW.  Else it sets the value of glFrontFace to
-GL_CCW (the default).
+this also updates the value of C<glFrontFace> to C<GL_CW>.  Else it sets the value of
+C<glFrontFace> to C<GL_CCW> (the default).
 
 =back
 
@@ -118,38 +121,39 @@ GL_CCW (the default).
 
 sub setup_projection {
 	my %args= @_ == 1 && ref($_[0]) eq 'HASH'? %{ $_[0] } : @_;
-	my ($ortho, $l, $r, $t, $b, $near, $far, $x, $y, $z, $aspect, $mirror_x, $mirror_y)
-		= delete @args{qw/ ortho left right top bottom near far x y z aspect mirror_x mirror_y /};
+	my ($ortho, $l, $r, $t, $b, $near, $far, $x, $y, $z, $w, $h, $aspect, $mirror_x, $mirror_y)
+		= delete @args{qw/ ortho left right top bottom near far x y z width height aspect mirror_x mirror_y /};
 	croak "Unexpected arguments to setup_projection"
 		if keys %args;
-	my $have_w= defined $l && defined $r;
-	my $have_h= defined $t && defined $b;
-	unless ($have_h && $have_w) {
+	$w= $r - $l if defined $l && defined $r;
+	$h= $t - $b if defined $t && defined $b;
+	unless (defined $w && defined $h) {
 		if (!$aspect or $aspect eq 'auto') {
-			my ($x, $y, $w, $h)= get_viewport_rect();
-			$aspect= $h / $h;
+			my ($x, $y, $vw, $vh)= get_viewport_rect();
+			$aspect= $vw && $vh? $vw / $vh : 1;
 		}
-		if (!$have_w) {
-			if (!$have_h) {
-				$t= (defined $b? -$b : 1) unless defined $t;
-				$b= -$t unless defined $b;
-			}
-			my $w= ($t - $b) * $aspect;
-			$r= (defined $l? $l + $w : $w / 2) unless defined $r;
-			$l= $r - $w unless defined $l;
+		# If neither, get creative.  Fall back to a Y-axis of -1..1
+		if (!defined $w && !defined $h) {
+			if    (defined $l) { $r= -$l; $w= $r-$l; }
+			elsif (defined $r) { $l= -$r; $w= $r-$l; }
+			elsif (defined $t) { $b= -$t; $h= $t-$b; }
+			elsif (defined $b) { $t= -$b; $h= $t-$b; }
+			else { $b= -1; $t= 1; $h= 2; }
 		}
-		else {
-			my $h= ($r - $l) / $aspect;
-			$t= (defined $b? $b + $h : $h / 2) unless defined $t;
-			$b= $t - $h unless defined $b;
-		}
+		# So now, we have height or have width.  Calc other from aspect.
+		$w //= $h * $aspect;
+		$h //= $w / $aspect;
 	}
-	($l, $r)= ($r, $l) if $mirror_x;
-	($t, $b)= ($b, $t) if $mirror_y;
-	$near= 1 unless defined $near;
-	$far= 1000 unless defined $far;
-	defined $_ or $_= 0
-		for ($x, $y, $z);
+	$r //= defined $l? $l + $w : $w / 2;
+	$l //= $r - $w;
+	$t //= defined $b? $b + $h : $h / 2;
+	$b //= $t - $h;
+	
+	$near //= $ortho? -1 : 1; # Frustum needs a positive near clipping plane.  Ortho can stay with GL default.
+	$far  //= 1000;
+	$x //= 0;
+	$y //= 0;
+	$z //= 0;
 	
 	# If Z is specified, then the left/right/top/bottom are interpreted to be the
 	# edges of the screen at this position.  Only matters for Frustum.
@@ -161,21 +165,20 @@ sub setup_projection {
 		$b *= $scale;
 	}
 	
+	# Apply mirror
+	($l, $r)= ($r, $l) if $mirror_x;
+	($t, $b)= ($b, $t) if $mirror_y;
+	# If mirror is in effect, need to tell OpenGL which winding means front-face
+	glFrontFace(!$mirror_x eq !$mirror_y? GL_CCW : GL_CW);
+	
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	
-	#print "l=$l r=$r b=$b t=$t near=$near far=$far\n";
 	$ortho? glOrtho($l, $r, $b, $t, $near, $far)
 	      : glFrustum($l, $r, $b, $t, $near, $far);
-	
 	glTranslated(-$x, -$y, -$z)
 		if $x or $y or $z;
-	
-	# If mirror is in effect, need to tell OpenGL which way the camera is
-	glFrontFace(!$mirror_x eq !$mirror_y? GL_CCW : GL_CW);
 	glMatrixMode(GL_MODELVIEW);
 }
-
 
 =head3 local_matrix
 
