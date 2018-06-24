@@ -32,6 +32,10 @@ use OpenGL::Sandbox::V1::Inline
 	LIBS => '-lGL -lGLU',
 	CCFLAGSEX => '-Wall -g3 -Os';
 
+use OpenGL::Sandbox::V1::DisplayList;
+# No ned to include Quadric.pm because it doesn't have any code in it, currently.
+# use OpenGL::Sandbox::V1::Quadric;
+
 # ABSTRACT: Various OpenGL tools and utilities that depend on the OpenGL 1.x API
 
 =head1 DESCRIPTION
@@ -383,7 +387,7 @@ Shortcut for L<OpenGL::Sandbox::V1::Quadric/sphere> on the L<default_quadric|Ope
 
   disk($inner_rad, $outer_rad, $slices, $stacks);
 
-Plot a disk around the Z axis with specified inner and outer radius.
+Plot a disk on XY plane around the Z axis with specified inner and outer radius.
 Shortcut for L<OpenGL::Sandbox::V1::Quadric/disk> on the L<default_quadric|OpenGL::Sandbox::ResMan/quadric>.
 
 =head3 partial_disk

@@ -3,8 +3,7 @@ package OpenGL::Sandbox::V1::DisplayList;
 use strict;
 use warnings;
 use overload '""' => sub { ${ shift() } };
-use OpenGL ();
-use OpenGL::Sandbox::V1;
+use OpenGL::Sandbox 'glDeleteLists';
 
 # ABSTRACT: Wrapper class for display lists
 
@@ -56,7 +55,7 @@ Call the display list, or if it hasn't been allocated yet, compile the sub first
 
 sub DESTROY {
 	my $self= shift;
-	OpenGL::glDeleteLists($$self, 1)
+	glDeleteLists($$self, 1)
 		if defined $$self;
 }
 

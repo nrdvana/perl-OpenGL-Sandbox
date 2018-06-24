@@ -371,6 +371,10 @@ SV * _displaylist_compile(SV *self, SV *code) {
 	call_sv(code, G_ARRAY|G_EVAL);
 	glEndList();
 	if (SvTRUE(ERRSV)) croak(NULL);
+	
+	/* Returning an *EXISTING* SV will confuse Inline, who expects us to have created a new one.
+	 * Could copy the SV, but bumping the reference count should be equivalent. */
+	SvREFCNT_inc(self);
 	return self;
 }
 
