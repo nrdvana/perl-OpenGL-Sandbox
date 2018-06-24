@@ -27,12 +27,8 @@ our %EXPORT_TAGS= (
 	all => \@EXPORT_OK,
 );
 
-use Inline
+use OpenGL::Sandbox::V1::Inline
 	CPP => do { my $x= __FILE__; $x =~ s|\.pm|\.cpp|; Cwd::abs_path($x) },
-	(defined $OpenGL::Sandbox::V1::VERSION? (
-		NAME => __PACKAGE__,
-		VERSION => __PACKAGE__->VERSION
-	) : () ),
 	LIBS => '-lGL -lGLU',
 	CCFLAGSEX => '-Wall -g3 -Os';
 

@@ -160,11 +160,8 @@ sub render {
 	$self->_ftgl_wrapper->render($text, @_ == 1 && ref $_[0] eq 'HASH'? %{$_[0]} : @_);
 }
 
-use Inline CPP => do { my $x= __FILE__; $x =~ s/\.pm$/\.cpp/; $x },
-	(defined $OpenGL::Sandbox::V1::FTGLFont::VERSION? (
-		NAME => __PACKAGE__,
-		VERSION => __PACKAGE__->VERSION
-	) : () ),
+use OpenGL::Sandbox::V1::FTGLFont::Inline
+	CPP => do { my $x= __FILE__; $x =~ s/\.pm$/\.cpp/; $x },
 	INC => '-I/usr/include/FTGL -I/usr/include/freetype2 -I'
 	       .do{ my $x= __FILE__; $x =~ s|/[^/]+$||; Cwd::abs_path($x) },
 	LIBS => '-lfreetype -lftgl';
