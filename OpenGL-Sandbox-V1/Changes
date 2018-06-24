@@ -1,0 +1,6 @@
+Version 0.03 - 2018-06-24
+  - Improved implementation of setup_projection, with tests
+  - Use Inline::Module, to avoid depending on Inline at runtime
+
+Version 0.02 - 2018-06-18
+  - Initial public release
