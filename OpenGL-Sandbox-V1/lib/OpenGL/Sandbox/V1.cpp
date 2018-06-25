@@ -76,7 +76,7 @@ void _local_gl(SV *code) {
 	glGetIntegerv(GL_MODELVIEW_STACK_DEPTH, &orig_depth);
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	glPushMatrix();
-	call_sv(code, G_ARRAY|G_EVAL);
+	call_sv(code, G_NOARGS|G_DISCARD|G_ARRAY|G_EVAL);
 	glPopMatrix();
 	glPopAttrib();
 	glGetIntegerv(GL_MODELVIEW_STACK_DEPTH, &depth);
@@ -92,7 +92,7 @@ void _local_matrix(SV *code) {
 	GLint orig_depth, depth;
 	glGetIntegerv(GL_MODELVIEW_STACK_DEPTH, &orig_depth);
 	glPushMatrix();
-	call_sv(code, G_ARRAY|G_EVAL);
+	call_sv(code, G_NOARGS|G_DISCARD|G_ARRAY|G_EVAL);
 	glPopMatrix();
 	glGetIntegerv(GL_MODELVIEW_STACK_DEPTH, &depth);
 	if (depth > orig_depth) {
@@ -174,35 +174,35 @@ void mirror(const char* axis) {
 
 void _quads(SV *code) {
 	glBegin(GL_QUADS);
-	call_sv(code, G_ARRAY|G_EVAL);
+	call_sv(code, G_NOARGS|G_DISCARD|G_ARRAY|G_EVAL);
 	glEnd();
 	if (SvTRUE(ERRSV)) croak(NULL);
 }
 
 void _quad_strip(SV *code) {
 	glBegin(GL_QUAD_STRIP);
-	call_sv(code, G_ARRAY|G_EVAL);
+	call_sv(code, G_NOARGS|G_DISCARD|G_ARRAY|G_EVAL);
 	glEnd();
 	if (SvTRUE(ERRSV)) croak(NULL);
 }
 
 void _triangles(SV* code) {
 	glBegin(GL_TRIANGLES);
-	call_sv(code, G_ARRAY|G_EVAL);
+	call_sv(code, G_NOARGS|G_DISCARD|G_ARRAY|G_EVAL);
 	glEnd();
 	if (SvTRUE(ERRSV)) croak(NULL);
 }
 
 void _triangle_fan(SV *code) {
 	glBegin(GL_TRIANGLE_FAN);
-	call_sv(code, G_ARRAY|G_EVAL);
+	call_sv(code, G_NOARGS|G_DISCARD|G_ARRAY|G_EVAL);
 	glEnd();
 	if (SvTRUE(ERRSV)) croak(NULL);
 }
 
 void _triangle_strip(SV *code) {
 	glBegin(GL_TRIANGLE_STRIP);
-	call_sv(code, G_ARRAY|G_EVAL);
+	call_sv(code, G_NOARGS|G_DISCARD|G_ARRAY|G_EVAL);
 	glEnd();
 	if (SvTRUE(ERRSV)) croak(NULL);
 }
@@ -211,7 +211,7 @@ void _lines(SV *code) {
 	glPushAttrib(GL_CURRENT_BIT | GL_ENABLE_BIT);
 	glDisable(GL_TEXTURE_2D);
 	glBegin(GL_LINES);
-	call_sv(code, G_ARRAY|G_EVAL);
+	call_sv(code, G_NOARGS|G_DISCARD|G_ARRAY|G_EVAL);
 	glEnd();
 	glPopAttrib();
 	if (SvTRUE(ERRSV)) croak(NULL);
@@ -221,7 +221,7 @@ void _line_strip(SV *code) {
 	glPushAttrib(GL_CURRENT_BIT | GL_ENABLE_BIT);
 	glDisable(GL_TEXTURE_2D);
 	glBegin(GL_LINE_STRIP);
-	call_sv(code, G_ARRAY|G_EVAL);
+	call_sv(code, G_NOARGS|G_DISCARD|G_ARRAY|G_EVAL);
 	glEnd();
 	glPopAttrib();
 	if (SvTRUE(ERRSV)) croak(NULL);
@@ -368,7 +368,7 @@ SV * _displaylist_compile(SV *self, SV *code) {
 	}
 	
 	glNewList(list_id, GL_COMPILE);
-	call_sv(code, G_ARRAY|G_EVAL);
+	call_sv(code, G_NOARGS|G_DISCARD|G_ARRAY|G_EVAL);
 	glEndList();
 	if (SvTRUE(ERRSV)) croak(NULL);
 	
@@ -393,7 +393,7 @@ void _displaylist_call(SV *self, ...) {
 			sv_setref_iv(self, "OpenGL::Sandbox::V1::DisplayList", list_id);
 		
 		glNewList(list_id, GL_COMPILE_AND_EXECUTE);
-		call_sv(code, G_ARRAY|G_EVAL);
+		call_sv(code, G_NOARGS|G_DISCARD|G_ARRAY|G_EVAL);
 		glEndList();
 		if (SvTRUE(ERRSV)) croak(NULL);
 	}
@@ -582,9 +582,22 @@ void get_viewport_rect(...) {
 	Inline_Stack_Vars;
 	GLint rect[4];
 	int i;
+	memset(rect, 0, sizeof(rect));
 	glGetIntegerv(GL_VIEWPORT, rect);
 	Inline_Stack_Reset;
 	for (i=0; i < 4; i++)
 		Inline_Stack_Push(sv_2mortal(newSViv(rect[i])));
+	Inline_Stack_Done;
+}
+
+void get_matrix(int matrix_id) {
+	Inline_Stack_Vars;
+	GLdouble model[16];
+	int i;
+	memset(model, 0, sizeof(model));
+	glGetDoublev(matrix_id, model);
+	Inline_Stack_Reset;
+	for (i= 0; i < 16; i++)
+		Inline_Stack_Push(sv_2mortal(newSVnv(model[i])));
 	Inline_Stack_Done;
 }

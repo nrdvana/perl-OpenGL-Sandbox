@@ -21,7 +21,7 @@ our @EXPORT_OK= qw(
 	compile_list call_list 
 	setcolor color_parts color_mult
 	draw_axes_xy draw_axes_xyz draw_boundbox
-	get_viewport_rect
+	get_viewport_rect get_matrix
 );
 our %EXPORT_TAGS= (
 	all => \@EXPORT_OK,
@@ -631,5 +631,20 @@ sub draw_boundbox {
 	};
 	glPopAttrib();
 }
+
+=head2 GETs
+
+In general, "Get" is bad because if the data is coming from the graphics card it can be slow.
+However, they can be valuable for debugging.  These are perl-ified versions of glGetxxx:
+
+=head3 get_viewport_rect
+
+  my ($x, $y, $w, $h)= get_viewport_rect;
+
+=head3 get_matrix
+
+  my @matrix4x4= get_matrix(GL_MODELVIEW_MATRIX);
+
+=cut
 
 1;
