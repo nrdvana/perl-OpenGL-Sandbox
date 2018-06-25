@@ -405,6 +405,7 @@ sub cylinder        { default_quadric->cylinder(@_)     }
 sub sphere          { default_quadric->sphere(@_)       }
 sub disk            { default_quadric->disk(@_)         }
 sub partial_disk    { default_quadric->partial_disk(@_) }
+END { undef $default_quadric; } # cleanup before global destruction
 
 =head2 DISPLAY LISTS
 

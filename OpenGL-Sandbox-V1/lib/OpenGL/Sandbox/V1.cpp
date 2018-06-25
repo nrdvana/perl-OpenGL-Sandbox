@@ -19,42 +19,50 @@ public:
 		if (q) gluDeleteQuadric(q), q= NULL;
 	}
 	
-	/* Return 'this' for chaining convenience */
-	SV* draw_style(int style) {
+	// Return 'this' for chaining convenience
+	void draw_style(int style) {
 		Inline_Stack_Vars;
-		(void)items; /* silence arning */
+		(void)items; // silence warning
 		gluQuadricDrawStyle(q, style);
-		return Inline_Stack_Item(0);
+		Inline_Stack_Reset;
+		Inline_Stack_Push(Inline_Stack_Item(0));
+		Inline_Stack_Done;
 	}
-	SV* draw_fill()       { return draw_style(GLU_FILL); }
-	SV* draw_line()       { return draw_style(GLU_LINE); }
-	SV* draw_silhouette() { return draw_style(GLU_SILHOUETTE); }
-	SV* draw_point()      { return draw_style(GLU_POINT); }
+	void draw_fill()       { draw_style(GLU_FILL); }
+	void draw_line()       { draw_style(GLU_LINE); }
+	void draw_silhouette() { draw_style(GLU_SILHOUETTE); }
+	void draw_point()      { draw_style(GLU_POINT); }
 	
-	SV* normals(int normals) {
+	void normals(int normals) {
 		Inline_Stack_Vars;
-		(void)items; /* silence arning */
+		(void)items; // silence warning
 		gluQuadricNormals(q, normals == 0? GLU_NONE : normals);
-		return Inline_Stack_Item(0);
+		Inline_Stack_Reset;
+		Inline_Stack_Push(Inline_Stack_Item(0));
+		Inline_Stack_Done;
 	}
-	SV* no_normals()     { return normals(GLU_NONE); }
-	SV* flat_normals()   { return normals(GLU_FLAT); }
-	SV* smooth_normals() { return normals(GLU_SMOOTH); }
+	void no_normals()     { normals(GLU_NONE); }
+	void flat_normals()   { normals(GLU_FLAT); }
+	void smooth_normals() { normals(GLU_SMOOTH); }
 	
-	SV* orientation(int orient) {
+	void orientation(int orient) {
 		Inline_Stack_Vars;
-		(void)items; /* silence arning */
+		(void)items; // silence warning
 		gluQuadricOrientation(q, orient);
-		return Inline_Stack_Item(0);
+		Inline_Stack_Reset;
+		Inline_Stack_Push(Inline_Stack_Item(0));
+		Inline_Stack_Done;
 	}
-	SV* inside()  { return orientation(GLU_INSIDE); }
-	SV* outside() { return orientation(GLU_OUTSIDE); }
+	void inside()  { orientation(GLU_INSIDE); }
+	void outside() { orientation(GLU_OUTSIDE); }
 	
-	SV* texture(bool enabled) {
+	void texture(bool enabled) {
 		Inline_Stack_Vars;
-		(void)items; /* silence arning */
+		(void)items; // silence warning
 		gluQuadricTexture(q, enabled? GLU_TRUE : GLU_FALSE);
-		return Inline_Stack_Item(0);
+		Inline_Stack_Reset;
+		Inline_Stack_Push(Inline_Stack_Item(0));
+		Inline_Stack_Done;
 	}
 	
 	void cylinder(double base, double top, double height, int slices, int stacks) {
