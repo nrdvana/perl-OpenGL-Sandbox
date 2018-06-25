@@ -12,6 +12,7 @@ use OpenGL::Sandbox qw/
 	glLoadIdentity glPushAttrib glPopAttrib glEnable glDisable glOrtho glFrustum glMatrixMode
 	glFrontFace glTranslated
 	GL_CURRENT_BIT GL_ENABLE_BIT GL_TEXTURE_2D GL_PROJECTION GL_CW GL_CCW GL_MODELVIEW
+	GL_LIGHTING GL_LIGHT0
 /;
 our @EXPORT_OK= qw(
 	local_matrix load_identity setup_projection scale trans trans_scale rotate mirror local_gl
@@ -19,7 +20,8 @@ our @EXPORT_OK= qw(
 	vertex plot_xy plot_xyz plot_st_xy plot_st_xyz plot_norm_st_xyz plot_rect plot_rect3
 	cylinder sphere disk partial_disk
 	compile_list call_list 
-	setcolor color_parts color_mult
+	setcolor color_parts color_mult set_light_ambient set_light_diffuse set_light_specular
+	set_light_position setup_sunlight
 	draw_axes_xy draw_axes_xyz draw_boundbox
 	get_viewport_rect get_matrix
 );
@@ -455,6 +457,24 @@ formats as setcolor.
   my ($r, $g, $b, $a)= color_mult( \@color1, \@color2 )
 
 Multiply each component of color1 by that component of color2.
+
+=head3 setup_sunlight
+
+This function enables a generic overhead light source similar to sunlight.  Light0 is set to
+a directional light source from above (+Y downward) with a slight yellow tinge and large
+ambient factor.  This is mostly useful for quick one-liner scripts to inspect shapes.
+
+=cut
+
+sub setup_sunlight {
+	glEnable(GL_LIGHTING);
+	glEnable(GL_LIGHT0);
+	load_identity();
+	set_light_ambient(GL_LIGHT0, 0.8, 0.8, 0.8, 0);
+ 	set_light_diffuse(GL_LIGHT0, 1.0, 1.0, 0.8, 0);
+	set_light_specular(GL_LIGHT0, 0.8, 0.8, 0.8, 0);
+	set_light_position(GL_LIGHT0, 0, 1, 0, 0);
+}
 
 =head2 MISC DRAWING
 

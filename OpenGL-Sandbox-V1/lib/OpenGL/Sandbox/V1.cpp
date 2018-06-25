@@ -494,6 +494,23 @@ static void _parse_color(SV *c, double *rgba) {
 	}
 }
 
+void set_light_ambient(int light_i, float r, float g, float b, float a) {
+	GLfloat v[4]= { r, g, b, a };
+	glLightfv(light_i, GL_AMBIENT, v);
+}
+void set_light_diffuse(int light_i, float r, float g, float b, float a) {
+	GLfloat v[4]= { r, g, b, a };
+	glLightfv(light_i, GL_DIFFUSE, v);
+}
+void set_light_specular(int light_i, float r, float g, float b, float a) {
+	GLfloat v[4]= { r, g, b, a };
+	glLightfv(light_i, GL_SPECULAR, v);
+}
+void set_light_position(int light_i, float x, float y, float z, float w) {
+	GLfloat v[4]= { x, y, z, w };
+	glLightfv(light_i, GL_POSITION, v);
+}
+
 void _texture_render(HV *self, ...) {
 	Inline_Stack_Vars;
 	SV *value, *w_sv= NULL, *h_sv= NULL, *def_w, *def_h;
