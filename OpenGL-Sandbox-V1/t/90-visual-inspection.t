@@ -58,7 +58,7 @@ show {};
 glClearColor(0,0,1,1);
 show {};
 
-#subtest textures => \&test_textures;
+subtest textures => \&test_textures;
 sub test_textures {
 	# Render texture at 0,0
 	glEnable(GL_TEXTURE_2D);
@@ -92,7 +92,7 @@ sub test_textures {
 	};
 };
 
-#subtest coordinate_sys => \&test_coordinate_sys;
+subtest coordinate_sys => \&test_coordinate_sys;
 sub test_coordinate_sys {
 	# Render a coordinate system
 	spin {

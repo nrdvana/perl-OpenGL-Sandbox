@@ -80,13 +80,13 @@ Plot a sphere around the origin with specified dimensions.
 
 =head2 cylinder
 
-  $q->cyliner($base, $top, $height, $slices, $stacks);
+  $q->cyliner($base_rad, $top_rad, $height, $slices, $stacks);
 
 Plot a hollow cylinder (without ends) along the Z axis with the specified dimensions.
 
 =head2 disk
 
-  $q->disk($inner, $outer, $slices, $loops);
+  $q->disk($inner_rad, $outer_rad, $slices, $loops);
 
 Plot a flat circle around the Z axis along the XY plane.  Nonzero inner radius
 "subtracts" a circle from the center.
