@@ -7,6 +7,7 @@ use Try::Tiny;
 use Exporter;
 use Carp;
 use Log::Any '$log';
+use Module::Runtime 'require_module';
 # Choose OpenGL::Modern if available, else fall back to OpenGL.
 # But use the one configured in the environment.  But yet don't blindly
 # load modules from environment either.
@@ -75,7 +76,7 @@ in the future.
 
 =cut
 
-our @EXPORT_OK= qw( font tex make_context get_gl_errors );
+our @EXPORT_OK= qw( font tex make_context get_gl_errors glGetString glGetError GL_VERSION );
 our %EXPORT_TAGS= ( all => \@EXPORT_OK );
 
 sub import {
@@ -191,6 +192,19 @@ See L<OpenGL::Sandbox::V1/setup_projection>.
 
 =cut
 
+our %provider_aliases;
+BEGIN {
+	%provider_aliases= (
+		'GLX'            => 'OpenGL::Sandbox::ContextShim::GLX',
+		'X11::GLX'       => 'OpenGL::Sandbox::ContextShim::GLX',
+		'X11::GLX::DWIM' => 'OpenGL::Sandbox::ContextShim::GLX',
+		'GLFW'           => 'OpenGL::Sandbox::ContextShim::GLFW',
+		'OpenGL::GLFW'   => 'OpenGL::Sandbox::ContextShim::GLFW',
+		'SDL'            => 'OpenGL::Sandbox::ContextShim::SDL',
+		'SDLx::App'      => 'OpenGL::Sandbox::ContextShim::SDL',
+	);
+}
+
 sub make_context {
 	my (%opts)= @_;
 	# Check for geometry specification on command line
@@ -211,78 +225,23 @@ sub make_context {
 		$opts{x} //= $l if defined $l;
 		$opts{y} //= $t if defined $t;
 	}
-	# Try X11 first, because lightest weight
+	
+	# Load user's requested provider, or auto-detect first available
 	my $provider= $ENV{OPENGL_SANDBOX_CONTEXT_PROVIDER};
 	$provider //=
-		eval('require X11::GLX::DWIM; 1;') ? 'X11::GLX::DWIM'
-		: eval('require SDLx::App; 1;') ? 'SDLx::App'
-		: croak "make_context needs one of X11::GLX or SDL to be installed";
-	if ($provider eq 'X11::GLX' || $provider eq 'X11::GLX::DWIM') {
-		require X11::GLX::DWIM;
-		my $glx= X11::GLX::DWIM->new();
-		my $visible= $opts{visible} // 1;
-		if ($visible) {
-			$glx->target({ window => {
-				x => $opts{x} // 0,
-				y => $opts{y} // 0,
-				width => $opts{width} // 400,
-				height => $opts{height} // 400
-			}});
-		} else {
-			$glx->target({ pixmap => {
-				width => $opts{width} // 256,
-				height => $opts{height} // 256
-			}});
-		}
-		$log->infof("Loaded X11::GLX::DWIM %s, target '%s', GLX Version %s, OpenGL version %s\n",
-			$glx->VERSION, $visible? 'window':'pixmap', $glx->glx_version, glGetString(GL_VERSION));
-		return $glx;
-	}
-	# TODO: Else try GLFW
-	# Else try SDL
-	elsif ($provider eq 'SDL' || $provider eq 'SDLx::App') {
-		my $sdl_subclass= _init_sdl_wrapper();
-		# TODO: Figure out best way to create invisible SDL window
-		if (defined $opts{visible} && !$opts{visible}) {
-			$opts{x}= -100;
-			$opts{width}= $opts{height}= 1;
-		}
-		# This is the only option I know of for SDL to set initial window placement
-		local $ENV{SDL_VIDEO_WINDOW_POS}= ($opts{x}//0).','.($opts{y}//0)
-			if defined $opts{x} || defined $opts{y};
-		my $flags= 0;
-		$flags |= SDL::SDL_NOFRAME() if $opts{noframe};
-		$flags |= SDL::SDL_FULLSCREEN() if $opts{fullscreen};
-		my $sdl= $sdl_subclass->new(
-			title  => $opts{title} // 'OpenGL',
-			(defined $opts{width}?  ( width  => $opts{width} ) : ()),
-			(defined $opts{height}? ( height => $opts{height} ) : ()),
-			($flags?                ( flags => (SDL::SDL_ANYFORMAT() | $flags) ) : ()),
-			opengl => 1,
-			exit_on_quit => 1,
-		);
-		$log->infof("Loaded SDLx::App %s, OpenGL version %s\n", $sdl->VERSION, glGetString(GL_VERSION));
-		return $sdl;
-	}
-	# TODO: else try Prima
-	else {
-		die "Unhandled context provider $provider";
-	}
-}
-
-sub _init_sdl_wrapper {
-	# Hack together a subclass of SDLx::App, but without alerting CPAN to its presence
-	# and without introducing it to the perl namespace unless SDLx::App exists.
-	unless (OpenGL::Sandbox::SDLx::App->VERSION) {
-		require SDLx::App;
-		no warnings 'once';
-		$OpenGL::Sandbox::SDLx::App::VERSION= __PACKAGE__->VERSION;
-		push @OpenGL::Sandbox::SDLx::App::ISA, 'SDLx::App';
-		*OpenGL::Sandbox::SDLx::App::swap_buffers= sub {
-			shift->sync;
-		};
-	}
-	return 'OpenGL::Sandbox::SDLx::App';
+		# Try X11 first, because lightest weight
+		eval('require X11::GLX::DWIM; 1;') ? 'GLX'
+		: eval('require OpenGL::GLFW; 1;') ? 'GLFW'
+		: eval('require SDLx::App; 1;') ? 'SDL'
+		: croak "make_context needs one of X11::GLX, OpenGL::GLFW, or SDLx::App to be installed";
+	
+	my $class= $provider_aliases{$provider}
+		or croak "Unhandled context provider $provider";
+	require_module($class);
+	
+	my $cx= $class->new(%opts);
+	$log->infof("Loaded %s", $cx->context_info);
+	return $cx;
 }
 
 =head2 get_gl_errors
