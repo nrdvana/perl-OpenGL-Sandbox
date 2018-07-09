@@ -1,4 +1,4 @@
-Version 0.03 - 2018-06-24
+Version 0.03 - 2018-07-09
   - Removed accidental dependency on X11::GLX
   - Added more options to make_context
   - Documented existing options to make_context
