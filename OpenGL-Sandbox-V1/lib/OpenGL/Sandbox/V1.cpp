@@ -362,7 +362,8 @@ void _setcolor(SV *thing, ...) {
 	Inline_Stack_Void;
 }
 
-SV * _displaylist_compile(SV *self, SV *code) {
+void _displaylist_compile(SV *self, SV *code) {
+	Inline_Stack_Vars;
 	int list_id;
 	if (SvROK(self) && SvIOK(SvRV(self)))
 		list_id= SvIV(SvRV(self));
@@ -376,14 +377,15 @@ SV * _displaylist_compile(SV *self, SV *code) {
 	}
 	
 	glNewList(list_id, GL_COMPILE);
+	PUSHMARK(SP);
+	PUTBACK;
 	call_sv(code, G_NOARGS|G_DISCARD|G_ARRAY|G_EVAL);
 	glEndList();
 	if (SvTRUE(ERRSV)) croak(NULL);
 	
-	/* Returning an *EXISTING* SV will confuse Inline, who expects us to have created a new one.
-	 * Could copy the SV, but bumping the reference count should be equivalent. */
-	SvREFCNT_inc(self);
-	return self;
+	Inline_Stack_Reset;
+	Inline_Stack_Push(self);
+	Inline_Stack_Done;
 }
 
 void _displaylist_call(SV *self, ...) {
@@ -401,6 +403,8 @@ void _displaylist_call(SV *self, ...) {
 			sv_setref_iv(self, "OpenGL::Sandbox::V1::DisplayList", list_id);
 		
 		glNewList(list_id, GL_COMPILE_AND_EXECUTE);
+		PUSHMARK(SP);
+		PUTBACK;
 		call_sv(code, G_NOARGS|G_DISCARD|G_ARRAY|G_EVAL);
 		glEndList();
 		if (SvTRUE(ERRSV)) croak(NULL);

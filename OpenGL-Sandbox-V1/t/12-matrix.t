@@ -29,7 +29,7 @@ sub assert_noerror {
 sub matrix_ok {
 	my ($expected, $name)= @_;
 	my @actual= get_matrix(GL_MODELVIEW_MATRIX);
-	$_= sprintf('%.04f', $_)
+	$_= (sprintf('%.04f', $_) =~ s/^-0.0000$/0.0000/r)  # tests were failing due to negative zero
 		for (@$expected, @actual);
 	is_deeply(\@actual, $expected, $name);
 }
