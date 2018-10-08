@@ -8,6 +8,7 @@ use Exporter;
 use Carp;
 use Log::Any '$log';
 use Module::Runtime 'require_module';
+use Scalar::Util 'weaken';
 # Choose OpenGL::Modern if available, else fall back to OpenGL.
 # But use the one configured in the environment.  But yet don't blindly
 # load modules from environment either.
@@ -76,7 +77,9 @@ in the future.
 
 =cut
 
-our @EXPORT_OK= qw( font tex make_context get_gl_errors glGetString glGetError GL_VERSION );
+our @EXPORT_OK= qw( font tex make_context current_context
+	get_gl_errors log_gl_errors warn_gl_errors
+	glGetString glGetError GL_VERSION );
 our %EXPORT_TAGS= ( all => \@EXPORT_OK );
 
 sub import {
@@ -205,6 +208,7 @@ BEGIN {
 	);
 }
 
+our $current_context;
 sub make_context {
 	my (%opts)= @_;
 	# Check for geometry specification on command line
@@ -241,8 +245,19 @@ sub make_context {
 	
 	my $cx= $class->new(%opts);
 	$log->infof("Loaded %s", $cx->context_info);
+	weaken($current_context= $cx); 
 	return $cx;
 }
+
+=head2 current_context
+
+Returns the most recently created result of L</make_context>, assuming it hasn't been
+garbage-collected.  In other words, there is a global weak-ref to the result of make_context.
+If you have a simple program with only one context, this global simplifies life for you.
+
+=cut
+
+sub current_context { $current_context }
 
 =head2 get_gl_errors
 
@@ -270,6 +285,16 @@ sub get_gl_errors {
 	push @names, $_gl_err_msg{$e} || "(unrecognized) ".$e
 		while (($e= glGetError()));
 	return @names;
+}
+
+sub log_gl_errors {
+	my @errors= get_gl_errors;
+	$log->error("GL Error Bits: ".join(', ', @errors)) if @errors;
+}
+
+sub warn_gl_errors {
+	my @errors= get_gl_errors;
+	warn("GL Error Bits: ".join(', ', @errors)."\n") if @errors;
 }
 
 1;

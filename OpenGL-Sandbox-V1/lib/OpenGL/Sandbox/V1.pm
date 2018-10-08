@@ -1,20 +1,19 @@
 package OpenGL::Sandbox::V1;
 
 use v5.14;
-use strict;
-use warnings;
+use Exporter::Extensible -exporter_setup => 1;
 use Carp;
-use parent 'Exporter';
 use Try::Tiny;
 use Math::Trig;
 use Cwd;
 use OpenGL::Sandbox qw/
 	glLoadIdentity glPushAttrib glPopAttrib glEnable glDisable glOrtho glFrustum glMatrixMode
-	glFrontFace glTranslated
+	glFrontFace glTranslated glClear
 	GL_CURRENT_BIT GL_ENABLE_BIT GL_TEXTURE_2D GL_PROJECTION GL_CW GL_CCW GL_MODELVIEW
-	GL_LIGHTING GL_LIGHT0
+	GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT GL_LIGHTING GL_LIGHT0
 /;
-our @EXPORT_OK= qw(
+export qw/
+	next_frame
 	local_matrix load_identity setup_projection scale trans trans_scale rotate mirror local_gl
 	lines line_strip quads quad_strip triangles triangle_strip triangle_fan
 	vertex plot_xy plot_xyz plot_st_xy plot_st_xyz plot_norm_st_xyz plot_rect plot_rect3
@@ -24,10 +23,7 @@ our @EXPORT_OK= qw(
 	set_light_position setup_sunlight
 	draw_axes_xy draw_axes_xyz draw_boundbox
 	get_viewport_rect get_matrix
-);
-our %EXPORT_TAGS= (
-	all => \@EXPORT_OK,
-);
+/;
 
 use OpenGL::Sandbox::V1::Inline
 	CPP => do { my $x= __FILE__; $x =~ s|\.pm|\.cpp|; Cwd::abs_path($x) },
@@ -48,6 +44,33 @@ OpenGL::Sandbox is located here, instead.  The main OpenGL::Sandbox module can a
 load this module using the import tag of C<:V1> or C<:V1:all>.
 
 =head1 EXPORTABLE FUNCTIONS
+
+=head2 WINDOW FUNCTIONS
+
+=head3 next_frame
+
+This ONLY works if you created one single OpenGL context using L<OpenGL::Sandbox/make_context>.
+(but this is often the case in simple programs).  It performs the following steps:
+
+  current_context->swap_buffers;
+  warn_gl_errors;
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  glLoadidentity();
+  
+This is intended to help out with quick prototyping and one-liners:
+
+  perl -e 'use OpenGL::Sandbox "V1:all"; my $cx= make_context; \
+	while(1) { next_frame; ...; }'
+
+=cut
+
+sub next_frame() {
+	my $gl= OpenGL::Sandbox::current_context();
+	$gl->swap_bufers if $gl;
+	OpenGL::Sandbox::warn_gl_errors();
+	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+	glLoadIdentity();
+}
 
 =head2 MATRIX FUNCTIONS
 
@@ -193,7 +216,7 @@ glPopMatrix calls.
 =cut
 
 sub local_matrix(&) { goto &_local_matrix }
-*load_identity= *glLoadIdentity;
+BEGIN { *load_identity= *glLoadIdentity; }
 
 =head3 scale
 
@@ -430,7 +453,7 @@ it every iteration after that.
 
 sub compile_list(&) { OpenGL::Sandbox::V1::DisplayList->new->compile(shift); }
 
-*call_list= *_displaylist_call;
+BEGIN { *call_list= *_displaylist_call; }
 
 =head2 COLORS
 
