@@ -156,8 +156,13 @@ Note: If this is a TextureFont, it will change the current bound texture.
 =cut
 
 sub render {
-	my ($self, $text)= (shift, shift);
-	$self->_ftgl_wrapper->render($text, @_ == 1 && ref $_[0] eq 'HASH'? %{$_[0]} : @_);
+	my $self= shift;
+	if (@_ == 2 && ref $_[1] eq 'HASH') {
+		my $opts= pop;
+		push @_, %$opts;
+	}
+	unshift @_, $self->_ftgl_wrapper;
+	goto $_[0]->can('render');
 }
 
 use OpenGL::Sandbox::V1::FTGLFont::Inline
