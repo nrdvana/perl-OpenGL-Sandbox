@@ -1,10 +1,8 @@
 package OpenGL::Sandbox;
 
 use v5.14; # I can aim for older upon request.  Not expecting any requests though.
-use strict;
-use warnings;
+use Exporter::Extensible -exporter_setup => 1;
 use Try::Tiny;
-use Exporter;
 use Carp;
 use Log::Any '$log';
 use Module::Runtime 'require_module';
@@ -66,83 +64,45 @@ currently.  Other font providers might be added later.
 sub tex  { OpenGL::Sandbox::ResMan->default_instance->tex(@_) }
 sub font { OpenGL::Sandbox::ResMan->default_instance->font(@_) }
 
-=head2 :V1:all
+=head2 -V1
 
-Exports ':all' from L<OpenGL::Sandbox::V1> (which must be installed separately).
-This module contains many "sugar" functions to make the GL 1.x API more friendly.
+Loads L<OpenGL::SandBox::V1> (which must be installed separately) and makes all its symbols
+available for importing.  This module contains many "sugar" functions to make the
+GL 1.x API more friendly.
 
-C<:V2:all>, C<:V3:all>, etc will likewise import everything from packages named
-C<OpenGL::SandBox::V$_> which do not currently exist, but could be authored
-in the future.
+C<-V2>, C<-V3>, etc will likewise import everything from packages named C<OpenGL::SandBox::V$_>
+which do not currently exist, but could be authored in the future.
 
 =cut
 
-our @EXPORT_OK= qw( font tex make_context current_context
+export qw( =$res font tex make_context current_context
 	get_gl_errors log_gl_errors warn_gl_errors
-	glGetString glGetError GL_VERSION );
-our %EXPORT_TAGS= ( all => \@EXPORT_OK );
+	glGetString glGetError GL_VERSION ),
+	-V1 => sub { require OpenGL::Sandbox::V1; };
 
-sub import {
-	my $caller= caller;
-	my $class= $_[0];
-	my @gl_const;
-	my @gl_fn;
-	for (reverse 1..$#_) {
-		my $arg= $_[$_];
-		if ($arg eq '$res') {
-			my $res= OpenGL::Sandbox::ResMan->default_instance;
-			no strict 'refs';
-			*{$caller.'::res'}= \$res;
-			splice(@_, $_, 1);
+sub _generateScalar_res { \OpenGL::Sandbox::ResMan->default_instance; }
+
+sub exporter_autoload_symbol {
+	my ($self, $sym)= @_;
+	if ($sym =~ /^(?:(GL_)|(gl[a-zA-Z]))/) {
+		# First import it into this package, for cached export
+		$OpenGLModule->import($sym);
+		no strict 'refs';
+		# If it is a constant, make sure it has been collapsed to a perl constant
+		# (the original OpenGL module fails to do this)
+		if ($1) {
+			my $val= __PACKAGE__->can($sym)->();
+			undef *$sym;
+			constant->import($sym => $val);
 		}
-		elsif ($arg =~ /^:V(\d)(:.*)?$/) {
-			my $mod= "OpenGL::Sandbox::V$1";
-			my $imports= $2;
-			$imports =~ s/:/ :/g;
-			eval "package $caller; use $mod qw/ $imports /; 1"
-				or croak "Can't load $mod (note that this must be installed separately)\n  $@";
-			splice(@_, $_, 1);
-		}
-		elsif ($arg =~ /^GL_/) {
-			push @gl_const, $arg;
-			splice(@_, $_, 1);
-		}
-		elsif ($arg =~ /^gl[a-zA-Z]/) {
-			# Let local methods in this package override external ones
-			unless ($class->can($arg)) {
-				push @gl_fn, $arg;
-				splice(@_, $_, 1);
-			}
-		}
+		return ($OpenGL::Sandbox::EXPORT{$sym}= __PACKAGE__->can($sym));
 	}
-	$class->_import_gl_constants_into($caller, @gl_const) if @gl_const;
-	$class->_import_gl_functions_into($caller, @gl_fn) if @gl_fn;
-	# Let the real Exporter module handle anything remaining in @_
-	goto \&Exporter::import;
-}
-
-sub _import_gl_constants_into {
-	my ($class, $into, @names)= @_;
-	# First, import into this module, then import into caller.  This resolves an
-	# inefficiency in traditional OpenGL module where it optimizes imports for
-	# import speed rather than runtime speed.  We want constants to actually be
-	# perl constants.
-	my @need_import_const= grep !$class->can($_), @names;
-	$OpenGLModule->import(@need_import_const);
-	# Now for each constant we imported, undefine it then pass it to the constant module
-	no strict 'refs';
-	for (@need_import_const) {
-		my $val= $class->can($_)->();
-		undef *$_;
-		constant->import($_ => $val);
+	# Notation of -V1 means require "OpenGL::Sandbox::V1".
+	elsif ($sym =~ /^-V(\d+)/) {
+		my $mod= "OpenGL::Sandbox::V$1";
+		return [ sub { require_module($mod) }, 0 ];
 	}
-	# Now import them all into caller
-	*{ $into . '::' . $_ }= $class->can($_) for @names;
-}
-
-sub _import_gl_functions_into {
-	my ($class, $into, @names)= @_;
-	eval "package $into; $OpenGLModule->import(\@names); 1" or die $@;
+	return $self->next::method($sym);
 }
 
 =head2 make_context

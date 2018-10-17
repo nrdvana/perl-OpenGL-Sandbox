@@ -11,13 +11,12 @@ use OpenGL::Sandbox qw/ make_context get_gl_errors /;
 # Override the glOrtho and glFrustum to save the coordinates locally
 our (@glOrtho, @glFrustum);
 BEGIN {
-	*OpenGL::Sandbox::glOrtho= sub { @glOrtho= @_; };
-	*OpenGL::Sandbox::glFrustum= sub { @glFrustum= @_; };
-	push @OpenGL::Sandbox::EXPORT_OK, 'glOrtho','glFrustum';
+	OpenGL::Sandbox->exporter_export(
+		glOrtho => sub { @glOrtho= @_; },
+		glFrustum => sub { @glFrustum= @_; },
+	);
 }
 use OpenGL::Sandbox::V1 'setup_projection';
-is( \&OpenGL::Sandbox::V1::glOrtho, \&OpenGL::Sandbox::glOrtho, 'installed mock method' )
-	or BAIL_OUT;
 
 my @tests= (
 	{ opts => [ left => -10, right => 10, bottom => -3, top => 3 ],

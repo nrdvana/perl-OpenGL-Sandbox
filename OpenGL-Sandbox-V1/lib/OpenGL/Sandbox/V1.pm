@@ -12,6 +12,7 @@ use OpenGL::Sandbox qw/
 	GL_CURRENT_BIT GL_ENABLE_BIT GL_TEXTURE_2D GL_PROJECTION GL_CW GL_CCW GL_MODELVIEW
 	GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT GL_LIGHTING GL_LIGHT0
 /;
+push @OpenGL::Sandbox::ISA, __PACKAGE__;
 export qw/
 	next_frame
 	local_matrix load_identity setup_projection scale trans trans_scale rotate mirror local_gl
