@@ -22,8 +22,8 @@ BEGIN {
 		: croak "Can't load either OpenGL::Modern or OpenGL.  Please install one.";
 	# If this succeeds, assume it is safe to eval this package name later
 	$mod->import(qw/
-		glGetString glGetError
-		GL_VERSION
+		glGetString glGetError glClear
+		GL_VERSION GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT
 	/);
 	$OpenGLModule= $mod;
 }
@@ -73,7 +73,7 @@ which do not currently exist, but could be authored in the future.
 
 =cut
 
-export qw( =$res font tex make_context current_context
+export qw( =$res font tex make_context current_context next_frame
 	get_gl_errors log_gl_errors warn_gl_errors
 	glGetString glGetError GL_VERSION ),
 	-V1 => sub { require OpenGL::Sandbox::V1; };
@@ -217,6 +217,34 @@ If you have a simple program with only one context, this global simplifies life 
 =cut
 
 sub current_context { $current_context }
+
+=head2 next_frame
+
+This calls a sequence of:
+
+  current_context->swap_buffers;
+  warn_gl_errors;
+  glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+
+If you have loaded "-V1" it also calls
+
+  glLoadIdentity();
+
+Note that C<< current_context->swap_buffers() >> will only work after L</make_context>.
+
+This is intended to help out with quick prototyping and one-liners:
+
+  perl -e 'use OpenGL::Sandbox qw( -V1 :all ); make_context; while(1) { next_frame; ...; }'
+
+=cut
+
+sub next_frame() {
+	my $gl= OpenGL::Sandbox::current_context();
+	$gl->swap_buffers if $gl;
+	warn_gl_errors();
+	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+	__PACKAGE__->maybe::next::method();
+}
 
 =head2 get_gl_errors
 

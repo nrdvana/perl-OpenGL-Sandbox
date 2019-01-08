@@ -50,27 +50,17 @@ load this module using the import tag of C<:V1> or C<:V1:all>.
 
 =head3 next_frame
 
-This ONLY works if you created one single OpenGL context using L<OpenGL::Sandbox/make_context>.
-(but this is often the case in simple programs).  It performs the following steps:
+Loading OpenGL::Sandbox::V1 causes the L<OpenGL::Sandbox/next_frame> function to also call
 
-  current_context->swap_buffers;
-  warn_gl_errors;
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  glLoadidentity();
-  
-This is intended to help out with quick prototyping and one-liners:
+  glLoadIdentity();
 
-  perl -e 'use OpenGL::Sandbox "V1:all"; my $cx= make_context; \
-	while(1) { next_frame; ...; }'
+This is excluded by default since glLoadIdentity isn't applicable to newer GL programs.
 
 =cut
 
-sub next_frame() {
-	my $gl= OpenGL::Sandbox::current_context();
-	$gl->swap_bufers if $gl;
-	OpenGL::Sandbox::warn_gl_errors();
-	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+sub next_frame {
 	glLoadIdentity();
+	($_[0] // __PACKAGE__)->maybe::next::method();
 }
 
 =head2 MATRIX FUNCTIONS
