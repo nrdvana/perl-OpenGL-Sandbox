@@ -191,9 +191,9 @@ See L<OpenGL::Sandbox::V1/setup_projection>.
 
 =cut
 
-our %provider_aliases;
+our %context_provider_aliases;
 BEGIN {
-	%provider_aliases= (
+	%context_provider_aliases= (
 		'GLX'            => 'OpenGL::Sandbox::ContextShim::GLX',
 		'X11::GLX'       => 'OpenGL::Sandbox::ContextShim::GLX',
 		'X11::GLX::DWIM' => 'OpenGL::Sandbox::ContextShim::GLX',
@@ -235,7 +235,7 @@ sub make_context {
 		: eval('require SDLx::App; 1;') ? 'SDL'
 		: croak "make_context needs one of X11::GLX, OpenGL::GLFW, or SDLx::App to be installed";
 	
-	my $class= $provider_aliases{$provider}
+	my $class= $context_provider_aliases{$provider}
 		or croak "Unhandled context provider $provider";
 	require_module($class);
 	
