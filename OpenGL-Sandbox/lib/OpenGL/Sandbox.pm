@@ -32,6 +32,39 @@ require OpenGL::Sandbox::ResMan;
 
 # ABSTRACT: Rapid-prototyping utilities for OpenGL
 
+=head1 SYNOPSIS
+
+  use OpenGL::Sandbox qw( -V1 :all );
+  make_context;
+  setup_projection;
+  next_frame;
+  scale .01;
+  font('Arial.ttf')->render("Hello World");
+  next_frame;
+
+=head1 DESCRIPTION
+
+This module collection aims to provide quick and easy access to OpenGL, for use in one-liners
+or experiments or simple visualizations.  There are many system dependencies involved, so to
+make the modules more accessible I divided it into multiple distributions:
+
+=over
+
+=item OpenGL::Sandbox
+
+This package, containing the foundation for the rest, and anything in common among the
+different OpenGL APIs.  It has methods to help set up the context, and load textures.
+
+=item L<OpenGL::Sandbox::V1>
+
+Everything related to OpenGL 1.x API
+
+=item L<OpenGL::Sandbox::V1::FTGLFont>
+
+A class providing fonts, but only for OpenGL 1.x
+
+=back
+
 =head1 EXPORTS
 
 =head2 GL_$CONSTANT, gl$Function
@@ -70,6 +103,10 @@ GL 1.x API more friendly.
 
 C<-V2>, C<-V3>, etc will likewise import everything from packages named C<OpenGL::SandBox::V$_>
 which do not currently exist, but could be authored in the future.
+
+=head2 :all
+
+This *only* exports the symbols defined by this module collection, *not* every OpenGL symbol.
 
 =cut
 
@@ -113,8 +150,9 @@ with environment variable C<OPENGL_SANDBOX_CONTEXT_PROVIDER>.
 It assumes you don't have any desire to receive user input and just want to render some stuff.
 If you do actually have a preference, you should just invoke that package yourself.
 
-Always returns an object whose scope controls the lifecycle of the window, and that object
-always has a C<swap_buffers> method.
+Returns an object whose scope controls the lifecycle of the window, and that object always has
+a C<swap_buffers> method.  If you call this method in void context, the object is stored
+internally and you can access it with L</current_context>.
 
 This attempts to automatically pick up the window geometry, either from a "--geometry=" option
 or from the environment variable C<OPENGL_SANDBOX_GEOMETRY>.  The Geometry value is in X11
@@ -211,7 +249,10 @@ sub make_context {
 =head2 current_context
 
 Returns the most recently created result of L</make_context>, assuming it hasn't been
-garbage-collected.  In other words, there is a global weak-ref to the result of make_context.
+garbage-collected.  If you stored the return value of L</make_context>, then garbage
+collection happens according to that reference.  If you called L</make_context> in void
+context, then the GL context will live indefinitely.
+
 If you have a simple program with only one context, this global simplifies life for you.
 
 =cut
@@ -249,6 +290,14 @@ sub next_frame() {
 =head2 get_gl_errors
 
 Returns the symbolic names of any pending OpenGL errors, as a list.
+
+=head2 log_gl_errors
+
+Write all GL errors to Log::Any as C<< ->error >>
+
+=head2 warn_gl_errors
+
+Emit any GL errors using 'warn'
 
 =cut
 
@@ -321,7 +370,7 @@ L<File::Map>, for efficiently memory-mapping resource files
 
 =item *
 
-L<Inline::C>, including a local C compiler
+XS support (C compiler)
 
 =back
 
@@ -332,10 +381,6 @@ For the "V1" module (L<OpenGL::Sandbox::V1>) you will additionally need
 =item *
 
 libGLU and headers
-
-=item *
-
-Inline::CPP, including a local C++ compiler
 
 =back
 
@@ -350,5 +395,5 @@ libftgl, and libfreetype2, and headers
 =back
 
 You probably also want a module to open a GL context to see things in.  This module is aware
-of L<X11::GLX> and L<SDL>, but you can use anything you like since the GL context
-is global.
+of L<OpenGL::GLFW>, L<X11::GLX> and L<SDL>, but you can use anything you like since the GL
+context is global.
