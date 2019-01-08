@@ -203,9 +203,10 @@ sub make_context {
 		or croak "Unhandled context provider $provider";
 	require_module($class);
 	
-	my $cx= $class->new(%opts);
+	undef $current_context;
+	my $cx= $current_context= $class->new(%opts);
 	$log->infof("Loaded %s", $cx->context_info);
-	weaken($current_context= $cx); 
+	weaken($current_context) if defined wantarray;
 	return $cx;
 }
 
