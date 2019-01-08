@@ -12,22 +12,20 @@ use Scalar::Util 'weaken';
 # load modules from environment either.
 our $OpenGLModule;
 BEGIN {
-	$OpenGLModule //= do {
-		my $fromenv= $ENV{OPENGL_SANDBOX_OPENGLMODULE} // '';
-		# Don't blindly require module from environment...
-		# Any other value, and the user must require it themself (such as perl -M)
-		eval "require $fromenv" if $fromenv eq 'OpenGL' || $fromenv eq 'OpenGL::Modern';
-		$fromenv? $fromenv
+	my $fromenv= $ENV{OPENGL_SANDBOX_OPENGLMODULE} // '';
+	# Don't blindly require module from environment...
+	# Any other value, and the user must require it themself (such as perl -M)
+	require_module($fromenv) if $fromenv eq 'OpenGL' || $fromenv eq 'OpenGL::Modern';
+	my $mod= $fromenv? $fromenv
 		: eval 'require OpenGL::Modern; 1'? 'OpenGL::Modern'
 		: eval 'require OpenGL; 1'? 'OpenGL'
 		: croak "Can't load either OpenGL::Modern or OpenGL.  Please install one.";
-	};
-	
 	# If this succeeds, assume it is safe to eval this package name later
-	$OpenGLModule->import(qw/
+	$mod->import(qw/
 		glGetString glGetError
 		GL_VERSION
 	/);
+	$OpenGLModule= $mod;
 }
 require constant;
 require OpenGL::Sandbox::ResMan;
