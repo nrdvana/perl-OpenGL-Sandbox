@@ -7,8 +7,8 @@ use Time::HiRes 'sleep';
 use Test::More;
 use Try::Tiny;
 use Log::Any::Adapter 'TAP';
-use OpenGL::Sandbox qw/ make_context get_gl_errors glFlush GL_TRIANGLES /;
-use OpenGL::Sandbox::V1 qw/ compile_list cylinder sphere disk partial_disk /;
+use OpenGL::Sandbox qw/ make_context get_gl_errors glFlush GL_TRIANGLES
+ -V1 compile_list cylinder sphere disk partial_disk /;
 
 my $c= try { make_context; }
 	or plan skip_all => "Can't test without context";

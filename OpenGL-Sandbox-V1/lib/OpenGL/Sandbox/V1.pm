@@ -6,13 +6,15 @@ use Carp;
 use Try::Tiny;
 use Math::Trig;
 use Cwd;
+use OpenGL::Sandbox 0.04;
 use OpenGL::Sandbox qw/
 	glLoadIdentity glPushAttrib glPopAttrib glEnable glDisable glOrtho glFrustum glMatrixMode
 	glFrontFace glTranslated glClear
 	GL_CURRENT_BIT GL_ENABLE_BIT GL_TEXTURE_2D GL_PROJECTION GL_CW GL_CCW GL_MODELVIEW
 	GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT GL_LIGHTING GL_LIGHT0
 /;
-push @OpenGL::Sandbox::ISA, __PACKAGE__;
+# Loading the V1 package makes extra stuff available from the main module
+unshift @OpenGL::Sandbox::ISA, __PACKAGE__;
 export qw/
 	next_frame
 	local_matrix load_identity setup_projection scale trans trans_scale rotate mirror local_gl
@@ -25,6 +27,7 @@ export qw/
 	draw_axes_xy draw_axes_xyz draw_boundbox
 	get_viewport_rect get_matrix
 /;
+$OpenGL::Sandbox::V1::VERSION ||= 0.04; # for testing before release
 
 use OpenGL::Sandbox::V1::Inline
 	CPP => do { my $x= __FILE__; $x =~ s|\.pm|\.cpp|; Cwd::abs_path($x) },
