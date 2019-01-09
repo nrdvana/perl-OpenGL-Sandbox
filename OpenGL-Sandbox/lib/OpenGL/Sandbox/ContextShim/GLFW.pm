@@ -9,12 +9,14 @@ use OpenGL::GLFW qw/ glfwInit glfwGetVersionString glfwTerminate NULL GLFW_TRUE 
 	glfwWindowHint GLFW_VISIBLE GLFW_DECORATED GLFW_MAXIMIZED GLFW_DOUBLEBUFFER
 	/;
 use OpenGL::Sandbox qw/ glGetString GL_VERSION /;
+use Scalar::Util 'weaken';
 
 # ABSTRACT: Context wrapper around OpenGL::GLFW API
 
 # would use Moo, but I want to write my own constructor rather than store
 # all these arguments as official attributes.
 our $glfw_init;
+our %instances;
 sub new {
 	my $class= shift;
 	my %opts= ref $_[0] eq 'HASH'? %{$_[0]} : @_;
@@ -40,15 +42,25 @@ sub new {
 	
 	glfwMakeContextCurrent($w);
 	glfwSwapInterval(1) if $opts{vsync} // 1;
+	
+	weaken($instances{$self}= $self);
 	return $self;
 }
 
 sub DESTROY {
 	my $self= shift;
 	glfwDestroyWindow(delete $self->{window}) if defined $self->{window};
+	delete $instances{$self};
 }
 
-END { glfwTerminate if $glfw_init }
+END {
+	for (values %instances) {
+		glfwDestroyWindow(delete $_->{window}) if defined $_->{window};
+	}
+	glfwTerminate if $glfw_init;
+}
+
+sub window { shift->{window} }
 
 sub context_info {
 	my $self= shift;
@@ -58,8 +70,10 @@ sub context_info {
 
 sub swap_buffers {
 	my $self= shift;
-	glfwSwapBuffers($self->{window});
-	glfwPollEvents;
+	if ($self->window) {
+		glfwSwapBuffers($self->window);
+		glfwPollEvents;
+	}
 }
 
 1;
@@ -68,7 +82,7 @@ sub swap_buffers {
 
 This class is loaded automatically if needed by L<OpenGL::Sandbox/make_context>.
 
-It provides
+It provides the standard ContextShim API:
 
 =over 14
 
@@ -81,5 +95,11 @@ Accepting all the options of make_context
 =item swap_buffers
 
 =back
+
+=head1 ATTRIBUTES
+
+=head2 window
+
+The GLFW window handle
 
 =cut

@@ -1,15 +1,17 @@
 package OpenGL::Sandbox::ContextShim::GLX;
 
-use parent 'X11::GLX::DWIM';
+use X11::GLX::DWIM;
 use OpenGL::Sandbox 'glGetString', 'GL_VERSION';
+use Scalar::Util 'weaken';
 
 # ABSTRACT: Subclass of X11::GLX::DWIM to meet contract of OpenGL::Sandbox::make_context
 
+our %instances;
 sub new {
 	my $class= shift;
 	my %opts= ref $_[0] eq 'HASH'? %{$_[0]} : @_;
 	my $visible= $opts{visible} // 1;
-	my $glx= $class->SUPER::new();
+	my $glx= X11::GLX::DWIM->new();
 	# Target is lazy.  Make sure GL context fully initialized before return.
 	if ($visible) {
 		$glx->target({ window => {
@@ -24,13 +26,27 @@ sub new {
 			height => $opts{height} // 256
 		}});
 	}
-	return $glx;
+	my $self= bless { glx => $glx }, $class;
+	weaken($instances{$self}= $self);
+	return $self;
 }
+
+END {
+	delete $_->{glx} for values %instances;
+}
+
+sub glx { shift->{glx} }
 
 sub context_info {
 	my $self= shift;
 	sprintf("X11::GLX::DWIM %s, target '%s', GLX Version %s, OpenGL version %s\n",
-		$self->SUPER::VERSION, $self->target, $self->glx_version, glGetString(GL_VERSION));
+		$self->glx && $self->glx->VERSION, $self->glx && $self->glx->target,
+		$self->glx && $self->glx->glx_version, glGetString(GL_VERSION));
+}
+
+sub swap_buffers {
+	my $self= shift;
+	$self->glx->swap_buffers if $self->glx;
 }
 
 1;
@@ -51,6 +67,10 @@ Accepting all the options of make_context
 
 =back
 
-It also a subclass of X11::GLX::DWIM so you can call those methods on it too.
+=head1 ATTRIBUTES
+
+=head2 glx
+
+The L<X11::GLX::DWIM> object
 
 =cut

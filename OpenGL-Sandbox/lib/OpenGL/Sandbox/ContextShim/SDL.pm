@@ -1,10 +1,12 @@
 package OpenGL::Sandbox::ContextShim::SDL;
 
-use parent 'SDLx::App';
+use SDLx::App;
 use OpenGL::Sandbox 'glGetString', 'GL_VERSION';
+use Scalar::Util 'weaken';
 
 # ABSTRACT: Subclass of SDLx::App to meet contract of OpenGL::Sandbox::make_context
 
+my %instances;
 sub new {
 	my $class= shift;
 	my %opts= ref $_[0] eq 'HASH'? %{$_[0]} : @_;
@@ -19,7 +21,7 @@ sub new {
 	my $flags= 0;
 	$flags |= SDL::SDL_NOFRAME() if $opts{noframe};
 	$flags |= SDL::SDL_FULLSCREEN() if $opts{fullscreen};
-	$class->SUPER::new(
+	my $sdl= SDLx::App->new(
 		title  => $opts{title} // 'OpenGL',
 		(defined $opts{width}?  ( width  => $opts{width} ) : ()),
 		(defined $opts{height}? ( height => $opts{height} ) : ()),
@@ -27,15 +29,26 @@ sub new {
 		opengl => 1,
 		exit_on_quit => 1,
 	);
+	my $self= bless { sdl => $sdl }, $class;
+	weaken($instances{$self}= $self);
+	return $self;
 }
+
+END {
+	delete $_->{sdl} for values %instances;
+}
+
+sub sdl { shift->{sdl} }
 
 sub context_info {
 	my $self= shift;
-	sprintf("SDLx::App %s, OpenGL version %s\n", $self->SUPER::VERSION, glGetString(GL_VERSION));
+	sprintf("SDLx::App %s, OpenGL version %s\n",
+		$self->sdl && $self->sdl->VERSION, glGetString(GL_VERSION));
 }
 
 sub swap_buffers {
-	shift->sync;
+	my $self= shift;
+	$self->sdl->sync if $self->sdl;
 }
 
 1;
@@ -44,7 +57,7 @@ sub swap_buffers {
 
 This class is loaded automatically if needed by L<OpenGL::Sandbox/make_context>.
 
-It provides
+It provides the standard ContextShim API:
 
 =over 14
 
@@ -58,6 +71,10 @@ Accepting all the options of make_context
 
 =back
 
-It also a subclass of SDLx::App so you can call those methods on it too.
+=head1 ATTRIBUTES
+
+=head2 sdl
+
+The SDL::App object
 
 =cut
