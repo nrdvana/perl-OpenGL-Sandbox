@@ -1,11 +1,11 @@
 package OpenGL::Sandbox::V1::DisplayList;
-
 use strict;
 use warnings;
 use overload '""' => sub { ${ shift() } };
 use OpenGL::Sandbox 'glDeleteLists';
 
 # ABSTRACT: Wrapper class for display lists
+# VERSION
 
 =head1 ATTRIBUTES
 

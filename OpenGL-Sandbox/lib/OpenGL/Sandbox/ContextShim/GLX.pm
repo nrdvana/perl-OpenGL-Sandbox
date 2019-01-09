@@ -1,10 +1,13 @@
 package OpenGL::Sandbox::ContextShim::GLX;
-
-use X11::GLX::DWIM;
-use OpenGL::Sandbox 'glGetString', 'GL_VERSION';
+use strict;
+use warnings;
+use Carp;
 use Scalar::Util 'weaken';
+use OpenGL::Sandbox qw/ glGetString GL_VERSION /;
+use X11::GLX::DWIM;
 
 # ABSTRACT: Subclass of X11::GLX::DWIM to meet contract of OpenGL::Sandbox::make_context
+# VERSION
 
 our %instances;
 sub new {
@@ -67,10 +70,14 @@ Accepting all the options of make_context
 
 =back
 
-=head1 ATTRIBUTES
+It also provides:
 
-=head2 glx
+=over 14
+
+=item glx
 
 The L<X11::GLX::DWIM> object
+
+=back
 
 =cut

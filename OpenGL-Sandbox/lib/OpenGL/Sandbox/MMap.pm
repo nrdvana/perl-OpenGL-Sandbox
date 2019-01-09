@@ -1,10 +1,10 @@
 package OpenGL::Sandbox::MMap;
-
 use strict;
 use warnings;
 use File::Map 'map_file';
 
 # ABSTRACT: Wrapper around a memory-mapped scalar ref
+# VERSION
 
 =head1 SYNOPSIS
 

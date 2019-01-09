@@ -1,10 +1,13 @@
 package OpenGL::Sandbox::ContextShim::SDL;
-
-use SDLx::App;
-use OpenGL::Sandbox 'glGetString', 'GL_VERSION';
+use strict;
+use warnings;
+use Carp;
 use Scalar::Util 'weaken';
+use OpenGL::Sandbox qw/ glGetString GL_VERSION /;
+use SDLx::App;
 
 # ABSTRACT: Subclass of SDLx::App to meet contract of OpenGL::Sandbox::make_context
+# VERSION
 
 my %instances;
 sub new {
@@ -71,10 +74,14 @@ Accepting all the options of make_context
 
 =back
 
-=head1 ATTRIBUTES
+It also provides:
 
-=head2 sdl
+=over 14
+
+=item sdl
 
 The SDL::App object
+
+=back
 
 =cut

@@ -2,7 +2,8 @@ package OpenGL::Sandbox::V1::Quadric;
 
 require OpenGL::Sandbox::V1; # automatically loads Quadric via XS
 
-# ABSTRACT - Rendering parameters for various geometric shapes
+# ABSTRACT: Rendering parameters for various geometric shapes
+# VERSION
 
 =head1 SYNOPSIS
 
@@ -12,7 +13,7 @@ require OpenGL::Sandbox::V1; # automatically loads Quadric via XS
 
 GLU Quadrics are a funny name for a small object that holds a few rendering parameters for
 another few geometry-plotting functions.  They provide a quick/convenient way to render some
-simple solids without messing with a bunch of trigonometry and loops.
+simple polygon surfaces without messing with a bunch of trigonometry and loops.
 
 =head1 CONFIGURATION
 

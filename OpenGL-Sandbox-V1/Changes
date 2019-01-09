@@ -1,4 +1,4 @@
-Version 0.041 - 2019-01-09
+Version 0.042 - 2019-01-09
   - Loading -V1 now adds implied glLoadIdentity to next_frame()
   - Reworked for new export system of OpenGL::Sandbox 0.04
 

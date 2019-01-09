@@ -1,17 +1,17 @@
 package OpenGL::Sandbox::ContextShim::GLFW;
-
 use strict;
 use warnings;
 use Carp;
+use Scalar::Util 'weaken';
 use OpenGL::GLFW qw/ glfwInit glfwGetVersionString glfwTerminate NULL GLFW_TRUE GLFW_FALSE
 	glfwGetPrimaryMonitor glfwCreateWindow glfwMakeContextCurrent glfwDestroyWindow
 	glfwSwapInterval glfwSwapBuffers glfwPollEvents
 	glfwWindowHint GLFW_VISIBLE GLFW_DECORATED GLFW_MAXIMIZED GLFW_DOUBLEBUFFER
 	/;
 use OpenGL::Sandbox qw/ glGetString GL_VERSION /;
-use Scalar::Util 'weaken';
 
 # ABSTRACT: Context wrapper around OpenGL::GLFW API
+# VERSION
 
 # would use Moo, but I want to write my own constructor rather than store
 # all these arguments as official attributes.
@@ -96,10 +96,14 @@ Accepting all the options of make_context
 
 =back
 
-=head1 ATTRIBUTES
+It also provides:
 
-=head2 window
+=over 14
+
+=item window
 
 The GLFW window handle
+
+=back
 
 =cut

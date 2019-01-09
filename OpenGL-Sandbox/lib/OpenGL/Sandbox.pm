@@ -1,5 +1,5 @@
 package OpenGL::Sandbox;
-
+# VERSION
 use v5.14; # I can aim for older upon request.  Not expecting any requests though.
 use Exporter::Extensible -exporter_setup => 1;
 use Try::Tiny;
@@ -145,8 +145,8 @@ sub exporter_autoload_symbol {
   my $context= make_context( %opts );
 
 Pick the lightest smallest module that can get a window set up for rendering.
-This tries: L<X11::GLX>, and L<SDLx::App> in that order.  You can override the detection
-with environment variable C<OPENGL_SANDBOX_CONTEXT_PROVIDER>.
+This tries: L<X11::GLX>, L<OpenGL::GLFW>, and L<SDLx::App> in that order.
+You can override the detection with environment variable C<OPENGL_SANDBOX_CONTEXT_PROVIDER>.
 It assumes you don't have any desire to receive user input and just want to render some stuff.
 If you do actually have a preference, you should just invoke that package yourself.
 

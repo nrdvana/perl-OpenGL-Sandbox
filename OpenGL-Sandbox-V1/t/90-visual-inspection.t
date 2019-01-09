@@ -7,6 +7,7 @@ use Time::HiRes 'sleep';
 use Test::More;
 use Try::Tiny;
 use Log::Any::Adapter 'TAP';
+BEGIN { $OpenGL::Sandbox::V1::VERSION= $ENV{ASSUME_V1_VERSION} } # for testing before release
 use OpenGL::Sandbox qw(
 	make_context $res tex glEnable glBlendFunc glClear glClearColor get_gl_errors
 	glBlendFunc

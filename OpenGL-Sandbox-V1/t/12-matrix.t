@@ -7,6 +7,7 @@ use Time::HiRes 'sleep';
 use Test::More;
 use Try::Tiny;
 use Log::Any::Adapter 'TAP';
+BEGIN { $OpenGL::Sandbox::V1::VERSION= $ENV{ASSUME_V1_VERSION} } # for testing before release
 use OpenGL::Sandbox qw/ next_frame make_context get_gl_errors glFlush GL_TRIANGLES GL_MODELVIEW_MATRIX
  -V1 local_matrix load_identity rotate scale trans trans_scale get_matrix /;
 

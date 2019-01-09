@@ -1,10 +1,13 @@
 package OpenGL::Sandbox::V1::FTGLFont;
-
 use Moo;
 use Cwd;
+use OpenGL::Sandbox::V1 0.04;
 use OpenGL::Sandbox::MMap;
 
 # ABSTRACT: Wrapper object for FTGL Fonts
+BEGIN {
+# VERSION
+}
 
 =head1 DESCRIPTION
 
@@ -39,7 +42,7 @@ object.
 
 =head2 filename
 
-The name this data was loaded from, for reference purposes only.
+The name this data was loaded from, for informational purposes only.
 
 =head2 face_size
 

@@ -1,5 +1,4 @@
 package OpenGL::Sandbox::ResMan;
-
 use Moo;
 use Try::Tiny;
 use Carp;
@@ -10,6 +9,7 @@ use File::Find ();
 use Scalar::Util ();
 
 # ABSTRACT: Resource manager for OpenGL prototyping
+# VERSION
 
 =head1 SYNOPSIS
 

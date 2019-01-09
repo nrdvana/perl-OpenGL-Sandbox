@@ -1,5 +1,4 @@
 package OpenGL::Sandbox::V1;
-
 use v5.14;
 use Exporter::Extensible -exporter_setup => 1;
 use Carp;
@@ -27,7 +26,9 @@ export qw/
 	draw_axes_xy draw_axes_xyz draw_boundbox
 	get_viewport_rect get_matrix
 /;
-$OpenGL::Sandbox::V1::VERSION ||= 0.04; # for testing before release
+BEGIN {
+# VERSION
+}
 
 use OpenGL::Sandbox::V1::Inline
 	CPP => do { my $x= __FILE__; $x =~ s|\.pm|\.cpp|; Cwd::abs_path($x) },

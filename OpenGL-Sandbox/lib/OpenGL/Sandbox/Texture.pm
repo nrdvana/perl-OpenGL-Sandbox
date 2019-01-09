@@ -1,5 +1,4 @@
 package OpenGL::Sandbox::Texture;
-
 use Moo;
 use Carp;
 use Try::Tiny;
@@ -10,6 +9,9 @@ use OpenGL::Sandbox qw(
 use OpenGL::Sandbox::MMap;
 
 # ABSTRACT: Wrapper object for OpenGL texture
+BEGIN {
+# VERSION
+}
 
 =head1 ATTRIBUTES
 
