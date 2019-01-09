@@ -42,10 +42,11 @@ use OpenGL::Sandbox::V1::DisplayList;
 
 =head1 DESCRIPTION
 
-This module is separated from OpenGL::Sandbox in order to keep the OpenGL API dependencies
+This module is seperate from OpenGL::Sandbox in order to keep the OpenGL API dependencies
 less tangled.  Everything specific to OpenGL 1.x that I would have otherwise included in
 OpenGL::Sandbox is located here, instead.  The main OpenGL::Sandbox module can automatically
-load this module using the import tag of C<:V1> or C<:V1:all>.
+load this module using the import tag of C<-V1>.  After doing so, all these additional
+symbols are made available from the main L<OpenGL::Sandbox> module.
 
 =head1 EXPORTABLE FUNCTIONS
 
