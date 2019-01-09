@@ -113,7 +113,7 @@ This *only* exports the symbols defined by this module collection, *not* every O
 export qw( =$res font tex make_context current_context next_frame
 	get_gl_errors log_gl_errors warn_gl_errors
 	glGetString glGetError GL_VERSION ),
-	-V1 => sub { require OpenGL::Sandbox::V1; };
+	-V1 => sub { Module::Runtime::use_module('OpenGL::Sandbox::V1','0.04'); };
 
 sub _generateScalar_res { \OpenGL::Sandbox::ResMan->default_instance; }
 
@@ -133,7 +133,7 @@ sub exporter_autoload_symbol {
 		return ($OpenGL::Sandbox::EXPORT{$sym}= __PACKAGE__->can($sym));
 	}
 	# Notation of -V1 means require "OpenGL::Sandbox::V1".
-	elsif ($sym =~ /^-V(\d+)/) {
+	elsif ($sym =~ /^-V([0-9]+)/) {
 		my $mod= "OpenGL::Sandbox::V$1";
 		return [ sub { require_module($mod) }, 0 ];
 	}
