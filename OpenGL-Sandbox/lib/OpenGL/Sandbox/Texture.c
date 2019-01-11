@@ -216,6 +216,18 @@ SV* _rescale_to_pow2_square(int width, int height, int has_alpha, int want_bgr, 
 	return newRV_inc(ret);
 }
 
+void _rgb_to_bgr(SV *sref, int has_alpha) {
+	char *p= SCALAR_REF_DATA(sref), *last, c;
+	int px_size= has_alpha? 4 : 3;
+	int len= SCALAR_REF_LEN(sref);
+	if (!p || len < px_size) croak("Expected non-empty scalar-ref pixel buffer");
+	last= p + len - px_size;
+	while (p <= last) {
+		c= p[0]; p[0]= p[2]; p[2]= c;
+		p+= px_size;
+	}
+}
+
 void _bind_tx(HV *self, ...) {
 	int target= GL_TEXTURE_2D;
 	Inline_Stack_Vars;

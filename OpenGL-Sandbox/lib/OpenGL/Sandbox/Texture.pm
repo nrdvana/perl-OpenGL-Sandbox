@@ -251,8 +251,13 @@ sub _load_png_data_and_rescale {
 		or croak sprintf "$fname does not contain the expected number of data bytes (%d != %d * %d * %d)",
 			length($$dataref), $has_alpha? 4:3, $width, $height;
 	# Result is a ref to a scalar, to avoid copying
-	$dataref= _rescale_to_pow2_square($width, $height, $has_alpha, $use_bgr? 1 : 0, $dataref)
-		unless $width == $height && $width == _round_up_pow2($width);
+	unless ($width == $height && $width == _round_up_pow2($width)) {
+		$dataref= _rescale_to_pow2_square($width, $height, $has_alpha, $use_bgr? 1 : 0, $dataref);
+	}
+	elsif ($use_bgr) {
+		# need to swap bytes
+		_rgb_to_bgr($dataref, $has_alpha);
+	}
 	return $dataref, $width, $height;
 }
 
