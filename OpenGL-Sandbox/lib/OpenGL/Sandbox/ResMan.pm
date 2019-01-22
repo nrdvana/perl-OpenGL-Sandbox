@@ -104,6 +104,8 @@ Example shader_program_config
 has resource_root_dir => ( is => 'rw', default => sub { '.' } );
 has font_config       => ( is => 'rw', default => sub { +{} } );
 has tex_config        => ( is => 'rw', default => sub { +{} } );
+has shader_config     => ( is => 'rw', default => sub { +{} } );
+has shader_program_config => ( is => 'rw', default => sub { +{} } );
 has tex_fmt_priority  => ( is => 'rw', lazy => 1, builder => 1 );
 has tex_default_fmt   => ( is => 'rw', lazy => 1, builder => 1 );
 
@@ -126,9 +128,12 @@ sub _build_tex_default_fmt {
 
 has _fontdata_cache    => ( is => 'ro', default => sub { +{} } );
 has _font_cache        => ( is => 'ro', default => sub { +{} } );
-has _font_dir_cache    => ( is => 'lazy' );
+has _font_dir_cache    => ( is => 'lazy', clearer => 1 );
 has _texture_cache     => ( is => 'ro', default => sub { +{} } );
-has _texture_dir_cache => ( is => 'lazy' );
+has _texture_dir_cache => ( is => 'lazy', clearer => 1 );
+has _shader_dir_cache  => ( is => 'lazy', clearer => 1 );
+has _shader_cache      => ( is => 'ro', default => sub { +{} } );
+has _shader_program_cache => ( is => 'ro', default => sub { +{} } );
 
 sub _build__texture_dir_cache {
 	$_[0]->_cache_directory(catdir($_[0]->resource_root_dir, 'tex'), $_[0]->tex_fmt_priority)
@@ -137,7 +142,7 @@ sub _build__font_dir_cache {
 	$_[0]->_cache_directory(catdir($_[0]->resource_root_dir, 'font'));
 }
 sub _build__shader_dir_cache {
-	$_[0]->_cache_directory(catdir($_[0]->resource_root_dir, 'shader'), ['glsl','frag','vert']);
+	$_[0]->_cache_directory(catdir($_[0]->resource_root_dir, 'shader'));
 }
 
 =head1 METHODS
@@ -157,6 +162,7 @@ our $_default_instance;
 sub default_instance {
 	$_default_instance ||= __PACKAGE__->new();
 }
+END { $_default_instance->clear_cache }
 
 sub BUILD {
 	my $self= shift;
@@ -371,8 +377,16 @@ sub _load_shader {
 
   my $prog= $res->shader_program( $name );
 
-Return a named shader program.  Currently there is not any filesystem format available, and
-the settings must come from L</shader_program_config>.
+Return a named shader program.  The settings come from L</shader_program_config>, but if that
+does not specify C<shaders>, this will look through the C<< shaders/ >> directory for every
+shader that begins with this name.  For example, if the directory contains:
+
+   shaders/foo.vert
+   shaders/foo.frag
+
+Then this will augment the configuration with
+
+   shaders => { vert => 'foo.vert', frag => 'foo.frag' }
 
 Shader objects will always be returned, but using them will throw exceptions if the
 OpenGL context can't support them.
@@ -380,7 +394,7 @@ OpenGL context can't support them.
 =cut
 
 sub shader_program {
-	require OpenGL::Sandbox::Shader::Program;
+	require OpenGL::Sandbox::ShaderProgram;
 	no warnings 'redefine';
 	*shader_program= *_load_shader_program;
 	shift->_load_shader_program(@_);
@@ -395,7 +409,23 @@ sub _load_shader_program {
 		: do {
 			# Merge options, configured options, and configured defaults
 			my $default_cfg= $self->shader_program_config->{'*'} // {};
-			OpenGL::Sandbox::Shader::Program->new(%$default_cfg, %$name_cfg, %options);
+			# Find shaders with same base name as this program, unless they were
+			# specifically given by %options or %$name_cfg
+			my %shaders= $options{shaders}? %{$options{shaders}}
+				: $name_cfg->{shaders}? %{$name_cfg->{shaders}}
+				# If shaders "foo.frag" and "foo.vert" exist, then this
+				# will generate { frag => "foo.frag", vert => "foo.vert" }
+				: map { $_ =~ /^\Q$name\E\.(\w+)$/? ($1 => $_) : () }
+					keys %{ $self->_shader_dir_cache };
+			# But still merge in any of the defaults if they weren't overridden
+			%shaders= (%{$default_cfg->{shaders}}, %shaders)
+				if $default_cfg->{shaders};
+			# Now, translate the shader names into shader objects
+			$_= $self->load_shader($_)
+				for values %shaders;
+			OpenGL::Sandbox::ShaderProgram->new(
+				%$default_cfg, %$name_cfg, %options, shaders => \%shaders
+			);
 		}
 	};
 }
@@ -412,11 +442,14 @@ allocated.  The next access to any font or texture will re-load the resource fro
 
 sub clear_cache {
 	my $self= shift;
-	$self->_clear_texture_cache;
+	%{ $self->_texture_cache }= ();
 	$self->_clear_texture_dir_cache;
-	$self->_clear_font_cache;
-	$self->_clear_fontdata_cache;
+	%{ $self->_font_cache }= ();
+	%{ $self->_fontdata_cache }= ();
 	$self->_clear_font_dir_cache;
+	%{ $self->_shader_program_cache }= ();
+	%{ $self->_shader_cache }= ();
+	$self->_clear_shader_dir_cache;
 }
 
 sub _cache_directory {
@@ -433,22 +466,23 @@ sub _cache_directory {
 				unless file_name_is_absolute($full_path);
 		}
 		# Decide on the friendly name which becomes the key in the hash
-		(my $key= $rel_name) =~ s/\.\w+$//;
-		# If there is a conflict for the key, resolve with the extension priority (low wins)
-		# or else a key of literally $_ takes priority
-		if ($names{$key}) {
+		# (but the whole filename always becomes a key in the hash as well)
+		(my $short_name= $rel_name) =~ s/\.\w+$//;
+		# If there is a conflict for the short key...
+		if ($names{$short_name}) {
+			# If extension priority available, use that.  Else first in wins.
 			if (!$extension_priority) {
-				return unless $rel_name eq $key;
+				$short_name= $rel_name;
 			} else {
 				my ($this_ext)= ($full_path =~ /\.(\w+)$/);
-				my ($prev_ext)= ($names{$key}[1] =~ /\.(\w+)$/);
+				my ($prev_ext)= ($names{$short_name}[1] =~ /\.(\w+)$/);
 				($extension_priority->{$this_ext//''}//999) < ($extension_priority->{$prev_ext//''}//999)
-					or return;
+					or ($short_name= $rel_name);
 			}
 		}
 		# Stat, for device/inode.  But if stat fails, warn and skip it.
 		if (my ($dev, $inode)= stat $full_path) {
-			$names{$rel_name}= $names{$key}= [ "($dev,$inode)", $full_path ];
+			$names{$rel_name}= $names{$short_name}= [ "($dev,$inode)", $full_path ];
 		}
 		else {
 			$log->warn("Can't stat $full_path: $!");

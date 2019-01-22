@@ -35,10 +35,10 @@ sub _load {
 	$self->loaded(1);
 }
 
-sub _destroy {
+sub DESTROY {
 	my $self= shift;
-	glDeleteShader($self->shader_id) if $self->has_shader_id;
-	delete $self->{shader_id};
+	glDeleteShader($self->id) if $self->has_id;
+	delete $self->{id};
 }
 
 1;

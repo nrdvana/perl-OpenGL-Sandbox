@@ -48,7 +48,7 @@ sub _deactivate {
 	$self->compiled(0);
 }
 
-sub _destroy {
+sub DESTROY {
 	my $self= shift;
 	if ($self->has_id) {
 		$self->_deactivate;

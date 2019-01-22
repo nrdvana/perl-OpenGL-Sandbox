@@ -16,7 +16,6 @@ sub choose_implementation {
 
 sub OpenGL::Sandbox::ShaderProgram::Trampoline::_build_id { choose_implementation('_build_id', @_) }
 sub OpenGL::Sandbox::ShaderProgram::Trampoline::_load     { choose_implementation('_load', @_) }
-sub OpenGL::Sandbox::ShaderProgram::Trampoline::_destroy  { choose_implementation('_destroy', @_) }
 
 # ABSTRACT: Wrapper object for OpenGL shader program pipeline
 # VERSION
@@ -138,10 +137,6 @@ sub attr_by_name {
 sub uniform_by_name {
 	my ($self, $name)= @_;
 	$self->_uniform_cache->{$name} //= $self->_uniform_by_name($name);
-}
-
-sub DESTROY {
-	shift->_destroy;
 }
 
 1;

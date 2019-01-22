@@ -16,7 +16,6 @@ sub choose_implementation {
 
 sub OpenGL::Sandbox::Shader::Trampoline::_build_id { choose_implementation('_build_id', @_) }
 sub OpenGL::Sandbox::Shader::Trampoline::_load     { choose_implementation('_load', @_) }
-sub OpenGL::Sandbox::Shader::Trampoline::_destroy  { choose_implementation('_destroy', @_) }
 
 # ABSTRACT: Wrapper object for OpenGL shader
 # VERSION
@@ -112,10 +111,6 @@ sub load {
 	my $loader= $self->loader // '_load';
 	$self->$loader($fname);
 	$self;
-}
-
-sub DESTROY {
-	shift->_destroy;
 }
 
 1;
