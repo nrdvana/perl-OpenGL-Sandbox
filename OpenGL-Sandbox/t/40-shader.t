@@ -46,6 +46,11 @@ sub test_shader_program {
 	$prog->{shaders}{fragment}= OpenGL::Sandbox::Shader->new(filename => 'demo.frag', source => $simple_fragment_shader);
 	ok( eval { $prog->assemble; 1 }, 'compiled GL shader pipeline' )
 		or diag $@;
+	
+	my @uniforms= $prog->get_active_uniforms();
+	is_deeply( [ sort map $_->{name}, @uniforms ], ['mat'], 'found uniforms in program' );
+	diag explain @uniforms;
+	$prog->set_uniform('mat', 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
 	done_testing;
 }
 

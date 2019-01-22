@@ -74,11 +74,11 @@ A convenient accessor for listing out the values of the L</shader> hash.
 
 has name       => ( is => 'rw' );
 has id         => ( is => 'lazy', predicate => 1 );
-has shaders    => ( is => 'rw' );
+has shaders    => ( is => 'rw', default => sub { +{} } );
 sub shader_list { values %{ shift->shaders } }
 
-has _attribute_cache => ( is => 'rw' );
-has _uniform_cache   => ( is => 'rw' );
+has _attribute_cache => ( is => 'rw', default => sub { +{} } );
+has _uniform_cache   => ( is => 'rw', default => sub { +{} } );
 
 =head1 METHODS
 
