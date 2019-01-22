@@ -15,16 +15,21 @@ sub choose_implementation {
 }
 
 sub OpenGL::Sandbox::ShaderProgram::Trampoline::_build_id { choose_implementation('_build_id', @_) }
-sub OpenGL::Sandbox::ShaderProgram::Trampoline::_load     { choose_implementation('_load', @_) }
+sub OpenGL::Sandbox::ShaderProgram::Trampoline::_activate { choose_implementation('_activate', @_) }
+sub OpenGL::Sandbox::ShaderProgram::Trampoline::_assemble { choose_implementation('_assemble', @_) }
+sub OpenGL::Sandbox::ShaderProgram::Trampoline::_disassemble { choose_implementation('_disassemble', @_) }
+sub OpenGL::Sandbox::ShaderProgram::Trampoline::_attr_by_name { choose_implementation('_attr_by_name', @_) }
+sub OpenGL::Sandbox::ShaderProgram::Trampoline::_uniform_by_name { choose_implementation('_uniform_by_name', @_) }
 
 # ABSTRACT: Wrapper object for OpenGL shader program pipeline
 # VERSION
 
 =head1 DESCRIPTION
 
-OpenGL Shader get assembled into a pipeline.  In older versions of OpenGL, there was only one
-program composed of a vertex shader and fragment shader, and attacking one of those shaders was
-global.  In newer OpenGL, you may assemble multiple programs and switch between them.
+OpenGL shaders get assembled into a pipeline.  In older versions of OpenGL, there was only one
+program composed of a vertex shader and fragment shader, and attaching one of those shaders was
+a global change.  In newer OpenGL, you may assemble multiple program pipelines and switch
+between them.
 
 This class tries to support both APIs, by holding a set of shaders which you can then "activate".
 On newer OpenGL, this calls C<glUseProgram>.  On older OpenGL, this changes the global vertex
@@ -50,7 +55,7 @@ True if the id attribute has been lazy-loaded already.
 
 A friendly name for the program (as used by the L<OpenGL::Sandbox::ResMan|Resource Manager>).
 
-=head2 linked
+=head2 assembled
 
 Boolean; whether the program is ready to run.  This is always 'true' for older global-program
 OpenGL.
@@ -68,11 +73,10 @@ A convenient accessor for listing out the values of the L</shader> hash.
 =cut
 
 has name       => ( is => 'rw' );
-has id         => ( is => 'lazy' );
+has id         => ( is => 'lazy', predicate => 1 );
 has shaders    => ( is => 'rw' );
 sub shader_list { values %{ shift->shaders } }
 
-has compiled         => ( is => 'rw' );
 has _attribute_cache => ( is => 'rw' );
 has _uniform_cache   => ( is => 'rw' );
 
@@ -89,26 +93,29 @@ Returns C<$self> for convenient chaining.
 =cut
 
 sub activate {
-	my $self= shift;
-	$self->_activate;
-	$self;
+	$_[0]->_activate;
+	$_[0];
 }
 
-=head2 compile
+=head2 assemble
 
-For implementations where it matters, this attaches the shaders and links the program.
+For relevant implementations, this attaches the shaders and links the program.
 If it fails, this throws an exception.  For OpenGL 4 implementation, this only happens
-once, and any changes to L</shaders> afterward are ignored.
+once, and any changes to L</shaders> afterward are ignored.  Use L</disassemble> to remove
+the compiled state and be able to rearrange the shaders.
 
 Returns C<$self> for convenient chaining.
 
 =cut
 
-sub compile {
-	my $self= shift;
-	$self->_compile unless $self->compiled;
-	$self->compiled(1);
-	$self;
+sub assemble {
+	$_[0]->_assemble;
+	$_[0]
+}
+
+sub disassemble {
+	$_[0]->_disassemble;
+	$_[0]
 }
 
 =head2 attr_by_name

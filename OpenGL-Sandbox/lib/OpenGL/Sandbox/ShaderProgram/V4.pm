@@ -1,4 +1,5 @@
 package OpenGL::Sandbox::ShaderProgram::V4;
+use Moo;
 use Carp;
 use OpenGL::Sandbox qw(
 	warn_gl_errors
@@ -7,6 +8,8 @@ use OpenGL::Sandbox qw(
 	GL_LINK_STATUS GL_FALSE GL_TRUE GL_CURRENT_PROGRAM
 );
 use OpenGL::Modern::Helpers qw( glGetIntegerv_p glGetProgramInfoLog_p glGetProgramiv_p );
+
+has assembled => ( is => 'rw' );
 
 sub _build_id {
 	my $self= shift;
@@ -19,8 +22,9 @@ sub _build_id {
 	$id;
 }
 
-sub _compile {
+sub _assemble {
 	my $self= shift;
+	return if $self->assembled;
 	my $id= $self->id;
 	warn_gl_errors;
 	for ($self->shader_list) {
@@ -34,24 +38,24 @@ sub _compile {
 		or croak "glLinkProgram failed: ".glGetProgramInfoLog_p($id);
 }
 
-sub _activate {
+sub _disassemble {
 	my $self= shift;
-	$self->_compile unless $self->compiled;
-	glUseProgram($self->id);
-}
-
-sub _deactivate {
-	my $self= shift;
-	return unless $self->has_id && $self->compiled;
+	return unless $self->has_id && $self->assembled;
 	glUseProgram(0) if glGetIntegerv_p(GL_CURRENT_PROGRAM, 1) == $self->id;
 	$_->has_id && glDetachShader($self->id, $_->id) for @{ $self->shader_list };
-	$self->compiled(0);
+	$self->assembled(0);
+}
+
+sub _activate {
+	my $self= shift;
+	$self->_assemble unless $self->assembled;
+	glUseProgram($self->id);
 }
 
 sub DESTROY {
 	my $self= shift;
 	if ($self->has_id) {
-		$self->_deactivate;
+		$self->_disassemble;
 		glDeleteProgram(delete $self->{id});
 	}
 }

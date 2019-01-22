@@ -44,7 +44,7 @@ sub test_shader_program {
 	my $prog= new_ok( 'OpenGL::Sandbox::ShaderProgram', [ name => 'Test' ], shaders => {} );
 	$prog->{shaders}{vertex}= OpenGL::Sandbox::Shader->new(filename => 'demo.vert', source => $simple_vertex_shader);
 	$prog->{shaders}{fragment}= OpenGL::Sandbox::Shader->new(filename => 'demo.frag', source => $simple_fragment_shader);
-	ok( eval { $prog->compile; 1 }, 'compiled GL shader pipeline' )
+	ok( eval { $prog->assemble; 1 }, 'compiled GL shader pipeline' )
 		or diag $@;
 	done_testing;
 }

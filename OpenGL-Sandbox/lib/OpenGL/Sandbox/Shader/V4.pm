@@ -1,4 +1,5 @@
 package OpenGL::Sandbox::Shader::V4;
+use Moo;
 use Carp;
 use OpenGL::Sandbox qw(
 	warn_gl_errors

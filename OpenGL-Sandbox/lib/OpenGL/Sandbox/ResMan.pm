@@ -162,7 +162,7 @@ our $_default_instance;
 sub default_instance {
 	$_default_instance ||= __PACKAGE__->new();
 }
-END { $_default_instance->clear_cache }
+END { $_default_instance->clear_cache if $_default_instance }
 
 sub BUILD {
 	my $self= shift;

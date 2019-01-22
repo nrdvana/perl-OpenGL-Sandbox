@@ -85,7 +85,7 @@ has source     => ( is => 'rw' );
 has loader     => ( is => 'rw' );
 has loaded     => ( is => 'rw' );
 has type       => ( is => 'rw' );
-has id         => ( is => 'lazy' );
+has id         => ( is => 'lazy', predicate => 1 );
 
 =head1 METHODS
 
