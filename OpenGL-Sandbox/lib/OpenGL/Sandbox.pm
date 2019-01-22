@@ -90,10 +90,20 @@ Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->font >>
 Note that you need to install L<OpenGL::Sandbox::V1::FTGLFont> in order to get font support,
 currently.  Other font providers might be added later.
 
+=head2 shader
+
+Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->shader >>
+
+=head2 shader_program
+
+Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->shader_program >>
+
 =cut
 
 sub tex  { OpenGL::Sandbox::ResMan->default_instance->tex(@_) }
 sub font { OpenGL::Sandbox::ResMan->default_instance->font(@_) }
+sub shader { OpenGL::Sandbox::ResMan->default_instance->shader(@_) }
+sub shader_program { OpenGL::Sandbox::ResMan->default_instance->shader_program(@_) }
 
 =head2 -V1
 
@@ -324,13 +334,15 @@ sub get_gl_errors {
 }
 
 sub log_gl_errors {
-	my @errors= get_gl_errors;
-	$log->error("GL Error Bits: ".join(', ', @errors)) if @errors;
+	my @errors= get_gl_errors or return;
+	$log->error("GL Error Bits: ".join(', ', @errors));
+	return 1;
 }
 
 sub warn_gl_errors {
-	my @errors= get_gl_errors;
-	warn("GL Error Bits: ".join(', ', @errors)."\n") if @errors;
+	my @errors= get_gl_errors or return;
+	warn("GL Error Bits: ".join(', ', @errors)."\n");
+	return 1;
 }
 
 1;

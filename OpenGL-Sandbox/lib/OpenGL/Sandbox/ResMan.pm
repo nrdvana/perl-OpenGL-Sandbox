@@ -39,6 +39,7 @@ The path where resources are located, adhering to the basic layout of:
   ./tex/default   # file or symlink for default texture.  Required.
   ./font/         # fonts compatible with libfreetype
   ./font/default  # file or symlink for default font.  Required.
+  ./shader/       # GLSL shaders with extension '.glsl', '.frag', or '.vert'
 
 =head2 font_config
 
@@ -71,6 +72,31 @@ Example tex_config:
     tile1   => { wrap_s => GL_REPEAT, wrap_t => GL_REPEAT },
     blocky  => { mag_filter => GL_NEAREST },
     alias1  => 'tile1',
+  }
+
+=head2 shader_config
+
+A hashref of shader names which holds default L<OpenGL::Sandbox::Shader|shader> constructor
+options.  The hash key of C<'*'> can be used to apply default values to every shader.
+
+Example shader_config:
+
+  {
+    '*' => { type => GL_FRAGMENT_SHADER },
+    aurora => { filename => 'aurora.frag' },
+    vpassthrough => { filename => 'vertex-passthrough.vert', type => GL_VERTEX_SHADER },
+  }
+
+=head2 shader_program_config
+
+A hashref of program (pipeline) names which holds default L<OpenGL::Sandbox::ShaderProgram|program>
+constructor options.  The hash key of C<'*'> can be used to apply default values to every program.
+
+Example shader_program_config
+
+  {
+    '*' => { shaders => { vertex => 'vpassthrough', fragment => 'aurora' } },
+    'demo' => { attr => { ... }, shaders => { vertex => 'special_vshader' } },
   }
 
 =cut
@@ -109,6 +135,9 @@ sub _build__texture_dir_cache {
 }
 sub _build__font_dir_cache {
 	$_[0]->_cache_directory(catdir($_[0]->resource_root_dir, 'font'));
+}
+sub _build__shader_dir_cache {
+	$_[0]->_cache_directory(catdir($_[0]->resource_root_dir, 'shader'), ['glsl','frag','vert']);
 }
 
 =head1 METHODS
@@ -272,7 +301,7 @@ sub load_texture {
 	require OpenGL::Sandbox::Texture;
 	no warnings 'redefine';
 	*load_texture= *_load_texture;
-	goto $_[0]->can('load_texture');
+	shift->_load_texture(@_);
 }
 sub _load_texture {
 	my ($self, $name, %options)= @_;
@@ -295,6 +324,99 @@ sub _load_texture {
 	$tex= OpenGL::Sandbox::Texture->new(%options, filename => $info->[1]);
 	$self->_texture_cache->{$name}= $tex;
 	return $tex;
+}
+
+=head2 shader
+
+  my $shader= $res->shader( $name );
+  my $shader= $res->load_shader( $name, %options );
+
+Returns a named shader.  A C<$name> ending with C<.frag> or C<.vert> will imply the relevant
+GL shader type, unless you specifically passed it in C<%options> or configured it in
+L</shader_config>.  Every call after the first uses the cached shader object, and C<%options>
+are ignored.
+
+Shader objects will always be returned, but using them will throw exceptions if the
+OpenGL context can't support them.
+
+=cut
+
+sub shader {
+	require OpenGL::Sandbox::Shader;
+	no warnings 'redefine';
+	*shader= *_load_shader;
+	*load_shader= *_load_shader;
+	shift->_load_shader(@_);
+}
+*load_shader= *shader;
+sub _load_shader {
+	my ($self, $name, %options)= @_;
+	return $self->_shader_cache->{$name} //= do {
+		$log->debug("loading shader $name");
+		my $name_cfg= $self->shader_config->{$name} // {};
+		# Check for alias
+		!ref $name_cfg? $self->_load_shader($name_cfg)
+		: do {
+			# Merge options, configured options, and configured defaults
+			my $default_cfg= $self->shader_config->{'*'} // {};
+			%options= ( filename => $name, %$default_cfg, %$name_cfg, %options );
+			my $info= $self->_shader_dir_cache->{$options{filename}}
+				or croak "No such shader '$options{filename}'";
+			OpenGL::Sandbox::Shader->new(%options, filename => $info->[1]);
+		}
+	};
+}
+
+=head2 shader_program
+
+  my $prog= $res->shader_program( $name );
+
+Return a named shader program.  Currently there is not any filesystem format available, and
+the settings must come from L</shader_program_config>.
+
+Shader objects will always be returned, but using them will throw exceptions if the
+OpenGL context can't support them.
+
+=cut
+
+sub shader_program {
+	require OpenGL::Sandbox::Shader::Program;
+	no warnings 'redefine';
+	*shader_program= *_load_shader_program;
+	shift->_load_shader_program(@_);
+}
+sub _load_shader_program {
+	my ($self, $name, %options)= @_;
+	return $self->_shader_program_cache->{$name} //= do {
+		$log->debug("loading shader program (pipeline) $name");
+		my $name_cfg= $self->shader_program_config->{$name} // {};
+		# Check for alias
+		!ref $name_cfg? $self->_load_shader_program($name_cfg)
+		: do {
+			# Merge options, configured options, and configured defaults
+			my $default_cfg= $self->shader_program_config->{'*'} // {};
+			OpenGL::Sandbox::Shader::Program->new(%$default_cfg, %$name_cfg, %options);
+		}
+	};
+}
+
+=head2 
+
+=head2 clear_cache
+
+Call this method to remove all current references to any resource.  If this was the last
+reference to those resources, it will also garbage collect any OpenGL resources that had been
+allocated.  The next access to any font or texture will re-load the resource from disk.
+
+=cut
+
+sub clear_cache {
+	my $self= shift;
+	$self->_clear_texture_cache;
+	$self->_clear_texture_dir_cache;
+	$self->_clear_font_cache;
+	$self->_clear_fontdata_cache;
+	$self->_clear_font_dir_cache;
 }
 
 sub _cache_directory {
@@ -333,23 +455,6 @@ sub _cache_directory {
 		}
 	}}, $path);
 	\%names;
-}
-
-=head2 clear_cache
-
-Call this method to remove all current references to any resource.  If this was the last
-reference to those resources, it will also garbage collect any OpenGL resources that had been
-allocated.  The next access to any font or texture will re-load the resource from disk.
-
-=cut
-
-sub clear_cache {
-	my $self= shift;
-	$self->_clear_texture_cache;
-	$self->_clear_texture_dir_cache;
-	$self->_clear_font_cache;
-	$self->_clear_fontdata_cache;
-	$self->_clear_font_dir_cache;
 }
 
 1;
