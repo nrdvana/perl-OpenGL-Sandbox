@@ -77,8 +77,9 @@ has id         => ( is => 'lazy', predicate => 1 );
 has shaders    => ( is => 'rw', default => sub { +{} } );
 sub shader_list { values %{ shift->shaders } }
 
+has uniforms   => ( is => 'lazy', predicate => 1, clearer => 1 );
+
 has _attribute_cache => ( is => 'rw', default => sub { +{} } );
-has _uniform_cache   => ( is => 'rw', default => sub { +{} } );
 
 =head1 METHODS
 
@@ -122,7 +123,7 @@ sub disassemble {
 
 Return the attribute ID of the given name, for the assembled program.
 
-=head2 uniform_by_name
+=head2 uniform_location
 
 Return the uniform ID of the given name, for the assembled program.
 
@@ -141,9 +142,9 @@ sub attr_by_name {
 	$self->_attribute_cache->{$name} //= $self->_attr_by_name($name);
 }
 
-sub uniform_by_name {
+sub uniform_location {
 	my ($self, $name)= @_;
-	$self->_uniform_cache->{$name} //= $self->_uniform_by_name($name);
+	($self->uniforms->{$name} // [])->[1];
 }
 
 1;

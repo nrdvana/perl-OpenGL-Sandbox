@@ -17,6 +17,8 @@ plan skip_all => "No support for modern shaders in this OpenGL context: $@"
 	unless eval { OpenGL::Sandbox::Shader::choose_implementation }
 		and eval { OpenGL::Sandbox::ShaderProgram::choose_implementation };
 
+OpenGL::Sandbox->import('GL_FLOAT_MAT4');
+
 my $simple_vertex_shader= <<END;
 attribute vec4 pos;
 uniform   mat4 mat;
@@ -47,9 +49,8 @@ sub test_shader_program {
 	ok( eval { $prog->assemble; 1 }, 'compiled GL shader pipeline' )
 		or diag $@;
 	
-	my @uniforms= $prog->get_active_uniforms();
-	is_deeply( [ sort map $_->{name}, @uniforms ], ['mat'], 'found uniforms in program' );
-	diag explain @uniforms;
+	is_deeply( $prog->uniforms, { mat => ['mat',0,GL_FLOAT_MAT4(),1] }, 'found uniforms in program' );
+	is( OpenGL::Sandbox::get_glsl_type_name($prog->uniforms->{mat}[2]), 'mat4', 'uniform glsl type name' );
 	$prog->set_uniform('mat', 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
 	done_testing;
 }

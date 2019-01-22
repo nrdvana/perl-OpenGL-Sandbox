@@ -1,5 +1,4 @@
 package OpenGL::Sandbox;
-# VERSION
 use v5.14; # I can aim for older upon request.  Not expecting any requests though.
 use Exporter::Extensible -exporter_setup => 1;
 use Try::Tiny;
@@ -7,6 +6,12 @@ use Carp;
 use Log::Any '$log';
 use Module::Runtime 'require_module';
 use Scalar::Util 'weaken';
+
+# ABSTRACT: Rapid-prototyping utilities for OpenGL
+BEGIN {
+# VERSION
+}
+
 # Choose OpenGL::Modern if available, else fall back to OpenGL.
 # But use the one configured in the environment.  But yet don't blindly
 # load modules from environment either.
@@ -28,9 +33,6 @@ BEGIN {
 	$OpenGLModule= $mod;
 }
 require constant;
-require OpenGL::Sandbox::ResMan;
-
-# ABSTRACT: Rapid-prototyping utilities for OpenGL
 
 =head1 SYNOPSIS
 
@@ -122,9 +124,16 @@ This *only* exports the symbols defined by this module collection, *not* every O
 
 export qw( =$res font tex make_context current_context next_frame
 	get_gl_errors log_gl_errors warn_gl_errors
-	glGetString glGetError GL_VERSION ),
-	-V1 => sub { Module::Runtime::use_module('OpenGL::Sandbox::V1','0.04'); };
+	gen_textures delete_texture round_up_pow2
+	glGetString glGetError GL_VERSION
+	),
+	-V1 => sub { Module::Runtime::use_module('OpenGL::Sandbox::V1','0.04'); },
+	# Conditionally export the stuff that gets conditionally compiled
+	map { __PACKAGE__->can($_)? ($_) : () } qw(
+	get_program_uniforms set_uniform get_glsl_type_name
+	);
 
+# Called when exporting '$res'
 sub _generateScalar_res { \OpenGL::Sandbox::ResMan->default_instance; }
 
 sub exporter_autoload_symbol {
@@ -344,6 +353,15 @@ sub warn_gl_errors {
 	warn("GL Error Bits: ".join(', ', @errors)."\n");
 	return 1;
 }
+
+# Pull in the C file and make sure it has all the C libs available
+use OpenGL::Sandbox::Inline
+	C => do { my $x= __FILE__; $x =~ s|\.pm|\.c|; Cwd::abs_path($x) },
+	INC => '-I'.do{ my $x= __FILE__; $x =~ s|/[^/]+$|/|; Cwd::abs_path($x) }.' -I/usr/include/ffmpeg',
+	LIBS => '-lGL -lswscale',
+	CCFLAGSEX => '-Wall -g3 -Os';
+
+require OpenGL::Sandbox::ResMan;
 
 1;
 

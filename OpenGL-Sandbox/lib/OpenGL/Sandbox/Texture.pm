@@ -4,14 +4,12 @@ use Carp;
 use Try::Tiny;
 use OpenGL::Sandbox qw(
 	GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_TEXTURE_MAG_FILTER GL_TEXTURE_WRAP_S GL_TEXTURE_WRAP_T
-	glTexParameteri glBindTexture
+	glTexParameteri glBindTexture gen_textures delete_texture
 );
 use OpenGL::Sandbox::MMap;
 
 # ABSTRACT: Wrapper object for OpenGL texture
-BEGIN {
 # VERSION
-}
 
 =head1 ATTRIBUTES
 
@@ -134,6 +132,7 @@ Returns C<$self> for convenient chaining.
 
 =cut
 
+sub _build_tx_id { gen_textures(1) }
 sub bind {
 	my ($self, $target)= @_;
 	glBindTexture($target // GL_TEXTURE_2D, $self->tx_id);
@@ -141,6 +140,11 @@ sub bind {
 		$self->load;
 	}
 	$self;
+}
+
+sub DESTROY {
+	my $self= shift;
+	delete_texture(delete $self->{tx_id}) if $self->has_tx_id;
 }
 
 =head2 load
@@ -188,14 +192,16 @@ Same as rgb, except the source data has the red and blue bytes swapped.
 sub load_rgb {
 	my ($self, $fname)= @_;
 	my $mmap= OpenGL::Sandbox::MMap->new($fname);
-	$self->_load_rgb_square($mmap, 0);
+	$self->tx_id; # make sure it is built
+	OpenGL::Sandbox::_texture_load_rgb_square($self, $mmap, 0);
 	$self->loaded(1);
 	return $self;
 }
 sub load_bgr {
 	my ($self, $fname)= @_;
 	my $mmap= OpenGL::Sandbox::MMap->new($fname);
-	$self->_load_rgb_square($mmap, 1);
+	$self->tx_id; # make sure it is built
+	OpenGL::Sandbox::_texture_load_rgb_square($self, $mmap, 1);
 	$self->loaded(1);
 	return $self;
 }
@@ -215,8 +221,9 @@ coordinates.  That could be a useful addition.
 sub load_png {
 	my ($self, $fname)= @_;
 	my $use_bgr= 1; # TODO: check OpenGL for optimal format
+	$self->tx_id; # make sure it is built
 	my ($imgref, $w, $h)= _load_png_data_and_rescale($fname, $use_bgr);
-	$self->_load_rgb_square($imgref, $use_bgr);
+	OpenGL::Sandbox::_texture_load_rgb_square($self, $imgref, $use_bgr);
 	$self->src_width($w);
 	$self->src_height($h);
 	$self->loaded(1);
@@ -251,12 +258,12 @@ sub _load_png_data_and_rescale {
 		or croak sprintf "$fname does not contain the expected number of data bytes (%d != %d * %d * %d)",
 			length($$dataref), $has_alpha? 4:3, $width, $height;
 	# Result is a ref to a scalar, to avoid copying
-	unless ($width == $height && $width == _round_up_pow2($width)) {
-		$dataref= _rescale_to_pow2_square($width, $height, $has_alpha, $use_bgr? 1 : 0, $dataref);
+	unless ($width == $height && $width == OpenGL::Sandbox::round_up_pow2($width)) {
+		$dataref= OpenGL::Sandbox::_img_rescale_to_pow2_square($width, $height, $has_alpha, $use_bgr? 1 : 0, $dataref);
 	}
 	elsif ($use_bgr) {
 		# need to swap bytes
-		_rgb_to_bgr($dataref, $has_alpha);
+		OpenGL::Sandbox::_img_rgb_to_bgr($dataref, $has_alpha);
 	}
 	return $dataref, $width, $height;
 }
@@ -351,12 +358,5 @@ sub convert_png {
 	print $dst_fh $$dataref;
 	close $dst_fh or croak "close($dst): $!";
 }
-
-# Pull in the C file and make sure it has all the C libs available
-use OpenGL::Sandbox::Texture::Inline
-	C => do { my $x= __FILE__; $x =~ s|\.pm|\.c|; Cwd::abs_path($x) },
-	INC => '-I'.do{ my $x= __FILE__; $x =~ s|/[^/]+$|/|; Cwd::abs_path($x) }.' -I/usr/include/ffmpeg',
-	LIBS => '-lGL -lswscale',
-	CCFLAGSEX => '-Wall -g3 -Os';
 
 1;

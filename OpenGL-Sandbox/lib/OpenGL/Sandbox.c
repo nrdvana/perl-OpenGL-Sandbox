@@ -9,41 +9,31 @@
 #define AV_PIX_FMT_BGRA PIX_FMT_BGRA
 #define AV_PIX_FMT_BGR24 PIX_FMT_BGR24
 #endif
+
+/* These macros are used to access the OpenGL::Sandbox::MMap object data */
 #define SCALAR_REF_DATA(obj) (SvROK(obj) && SvPOK(SvRV(obj))? (void*)SvPVX(SvRV(obj)) : (void*)0)
 #define SCALAR_REF_LEN(obj)  (SvROK(obj) && SvPOK(SvRV(obj))? SvCUR(SvRV(obj)) : 0)
 
-extern void glGenerateMipmap(int);
-
-/* This gets called by Moo */
-int _build_tx_id(HV *self) {
-	GLuint tx_id;
-	glGenTextures(1, &tx_id);
-	return tx_id;
+/* Reading from perl hashes is annoying.  This simplified function only returns
+ * non-NULL if the key existed and the value was defined.
+ */
+SV *_fetch_if_defined(HV *self, const char *field, int len) {
+	SV **field_p= hv_fetch(self, field, len, 0);
+	return (field_p && *field_p && SvOK(*field_p)) ? *field_p : NULL;
 }
-/* This is our shortcut to bypass Moo from C.  The more correct thing to do would be set up a call
- * stack and call $self->_build_tx_id in case someone overrode it in a subclass. */
-int _lazy_build_tx_id(HV *self) {
-	SV **field_p= hv_fetch(self, "tx_id", 5, 1);
+
+/* These are wrappers around various OpenGL functions that don't have a nice and/or consistent
+ * wrapper between OpenGL and OpenGL::Modern
+ */
+
+int gen_textures(int count) {
 	GLuint tx_id;
-	if (!field_p || !*field_p)
-		croak("Can't store results in supplied hash");
-	if (SvIOK(*field_p)) {
-		tx_id= SvIV(*field_p);
-	} else {
-		tx_id= _build_tx_id(self);
-		sv_setiv(*field_p, tx_id);
-	}
+	glGenTextures(count, &tx_id);
 	return tx_id;
 }
 
-void DESTROY(HV *self) {
-	GLuint tx_id;
-	SV **field= hv_fetch(self, "tx_id", 5, 0);
-	if (field && *field && SvIOK(*field)) {
-		tx_id= SvIV(*field);
-		if (tx_id)
-			glDeleteTextures(1, &tx_id);
-	}
+void delete_texture(unsigned tx_id) {
+	glDeleteTextures(1, &tx_id);
 }
 
 /* This function operates on the idea that a power of two texture composed of
@@ -71,20 +61,15 @@ int _dimension_from_filesize(int filesize, int *has_alpha_out) {
 	}
 }
 
-/* Reading from perl hashes is annoying.  This simplified function only returns
- * non-NULL if the key existed and the value was defined.
- */
-SV *_fetch_if_defined(HV *self, const char *field, int len) {
-	SV **field_p= hv_fetch(self, field, len, 0);
-	return (field_p && *field_p && SvOK(*field_p)) ? *field_p : NULL;
-}
+extern void glGenerateMipmap(int);
 
-void _load_rgb_square(HV *self, SV *mmap, int is_bgr) {
+void _texture_load_rgb_square(HV *self, SV *mmap, int is_bgr) {
 	SV *sv;
 	void *data= SCALAR_REF_DATA(mmap);
 	int len= SCALAR_REF_LEN(mmap);
 	const char *ver;
 	int major, minor;
+	SV *tx_id_p=  _fetch_if_defined(self, "tx_id", 5);
 	SV *mipmap_p= _fetch_if_defined(self, "mipmap", 6);
 	SV *wrap_s_p= _fetch_if_defined(self, "wrap_s", 6);
 	SV *wrap_t_p= _fetch_if_defined(self, "wrap_t", 6);
@@ -95,6 +80,8 @@ void _load_rgb_square(HV *self, SV *mmap, int is_bgr) {
 	int gl_fmt= is_bgr? ( has_alpha? GL_BGRA : GL_BGR )
 	                  : ( has_alpha? GL_RGBA : GL_RGB );
 	int gl_internal_fmt= has_alpha? GL_RGBA : GL_RGB;
+	
+	if (!tx_id_p) croak("tx_id must be initialized first");
 	
 	/* use mipmaps if the user set it to true, or if the min_filter uses a mipmap,
 	   and default in absence of any user prefs is true. */
@@ -119,7 +106,7 @@ void _load_rgb_square(HV *self, SV *mmap, int is_bgr) {
 		croak("Can't get GL_VERSION");
 	
 	/* Bind texture */
-	glBindTexture(GL_TEXTURE_2D, _lazy_build_tx_id(self));
+	glBindTexture(GL_TEXTURE_2D, SvIV(tx_id_p));
 	
 	if (with_mipmaps) {
 		if (major < 3) {
@@ -165,7 +152,7 @@ void _load_rgb_square(HV *self, SV *mmap, int is_bgr) {
 	return;
 }
 
-int _round_up_pow2(long dim) {
+int round_up_pow2(long dim) {
 	--dim;
 	dim |= dim >> 32;
 	dim |= dim >> 16;
@@ -176,13 +163,13 @@ int _round_up_pow2(long dim) {
 	return ++dim;
 }
 
-SV* _rescale_to_pow2_square(int width, int height, int has_alpha, int want_bgr, SV *sref) {
+SV* _img_rescale_to_pow2_square(int width, int height, int has_alpha, int want_bgr, SV *sref) {
 	struct SwsContext *sws= NULL;
 	SV *ret= NULL;
 	void *data= SCALAR_REF_DATA(sref);
 	int len= SCALAR_REF_LEN(sref);
 	int px_size= has_alpha? 4 : 3;
-	int dim= _round_up_pow2(width > height? width : height);
+	int dim= round_up_pow2(width > height? width : height);
 	const uint8_t *src_planes[4]= { data,0,0,0 };
 	int src_stride[4]= { width*px_size,0,0,0 };
 	uint8_t *dst_planes[4]= { 0,0,0,0 };
@@ -216,7 +203,7 @@ SV* _rescale_to_pow2_square(int width, int height, int has_alpha, int want_bgr, 
 	return newRV_inc(ret);
 }
 
-void _rgb_to_bgr(SV *sref, int has_alpha) {
+void _img_rgb_to_bgr(SV *sref, int has_alpha) {
 	char *p= SCALAR_REF_DATA(sref), *last, c;
 	int px_size= has_alpha? 4 : 3;
 	int len= SCALAR_REF_LEN(sref);
@@ -228,11 +215,151 @@ void _rgb_to_bgr(SV *sref, int has_alpha) {
 	}
 }
 
-void _bind_tx(HV *self, ...) {
-	int target= GL_TEXTURE_2D;
+#ifdef GL_VERSION_2_0
+
+const char* get_glsl_type_name(int type) {
+	switch (type) {
+	case GL_FLOAT:             return "float";
+	case GL_FLOAT_VEC2:        return "vec2";
+	case GL_FLOAT_VEC3:        return "vec3";
+	case GL_FLOAT_VEC4:        return "vec4";
+	case GL_INT:               return "int";
+	case GL_INT_VEC2:          return "ivec2";
+	case GL_INT_VEC3:          return "ivec3";
+	case GL_INT_VEC4:          return "ivec4";
+	case GL_UNSIGNED_INT:      return "unsigned int";
+	case GL_UNSIGNED_INT_VEC2: return "uvec2";
+	case GL_UNSIGNED_INT_VEC3: return "uvec3";
+	case GL_UNSIGNED_INT_VEC4: return "uvec4";
+	case GL_FLOAT_MAT2:        return "mat2";
+	case GL_FLOAT_MAT3:        return "mat3";
+	case GL_FLOAT_MAT4:        return "mat4";
+	case GL_FLOAT_MAT2x3:      return "mat2x3";
+	case GL_FLOAT_MAT2x4:      return "mat2x4";
+	case GL_FLOAT_MAT3x2:      return "mat3x2";
+	case GL_FLOAT_MAT3x4:      return "mat3x4";
+	case GL_FLOAT_MAT4x2:      return "mat4x2";
+	case GL_FLOAT_MAT4x3:      return "mat4x3";
+	default: return NULL;
+	}
+}
+
+SV * get_program_uniforms(unsigned program) {
+	GLsizei namelen;
+	GLint size, loc, active_uniforms= 0, i;
+	GLenum type;
+	char namebuf[32];
+	HV *result; AV *item;
+	result= (HV*) sv_2mortal((SV*) newHV());
+	glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &active_uniforms);
+	for (i= 0; i < active_uniforms; i++) {
+		namelen= 0;
+		glGetActiveUniform(program, i, sizeof(namebuf)-1, &namelen, &size, &type, namebuf);
+		if (namelen > 0 && namelen < sizeof(namebuf)) {
+			namebuf[namelen]= '\0';
+			loc= glGetUniformLocation(program, namebuf);
+			item= (AV*) sv_2mortal((SV*) newAV());
+			av_extend(item, 3);
+			av_push(item, newSVpvn(namebuf, namelen));
+			av_push(item, newSViv(loc));
+			av_push(item, newSViv(type));
+			av_push(item, newSViv(size));
+			if (!hv_store(result, namebuf, namelen, newRV_inc((SV*)item), 0)) croak("hv_store failed");
+		}
+    }
+	return newRV_inc((SV*) result);
+}
+
+void set_uniform(unsigned program, SV* uniform_cache, const char *name, ...) {
 	Inline_Stack_Vars;
-	if (Inline_Stack_Items > 1)
-		target= SvIV(Inline_Stack_Item(1));
-	glBindTexture(_lazy_build_tx_id(self), target);
+	SV **entry, *s;
+	int type= 0, component_type, size= 0, loc= 0, components= 0, buf_req= 0, i;
+	char static_buf[ 8 * 16 ], *buf;
+	AV *info= NULL, *array= NULL;
+	
+	/* Lazy-build the uniform cache */
+	if (!SvROK(uniform_cache) || !SvOK(SvRV(uniform_cache)) || SvTYPE(SvRV(uniform_cache)) != SVt_PVHV) {
+		sv_setsv( uniform_cache, get_program_uniforms(program) );
+	}
+	
+	entry= hv_fetch((HV*) SvRV(uniform_cache), name, strlen(name), 0);
+	if (!entry || !*entry || !SvROK(*entry))
+		croak("No active uniform '%s' in program %d", name, program);
+	
+	if (SvTYPE(SvRV(*entry)) != SVt_PVAV || av_len(info= (AV*) SvRV(*entry)) < 3)
+		croak("Invalid uniform info record for %s", name);
+	
+	entry= av_fetch(info, 1, 0);
+	if (!entry || !*entry || !SvIOK(*entry)) croak("Invalid uniform info record for %s", name);
+	loc= SvIV(*entry);
+	
+	entry= av_fetch(info, 2, 0);
+	if (!entry || !*entry || !SvIOK(*entry)) croak("Invalid uniform info record for %s", name);
+	type= SvIV(*entry);
+	
+	entry= av_fetch(info, 3, 0);
+	if (!entry || !*entry || !SvIOK(*entry)) croak("Invalid uniform info record for %s", name);
+	size= SvIV(*entry);
+	
+	switch (type) {
+	if (0) { case GL_FLOAT: components= 1; }
+	if (0) { case GL_FLOAT_VEC2: components= 2; }
+	if (0) { case GL_FLOAT_VEC3: components= 3; }
+	if (0) { case GL_FLOAT_VEC4: components= 4; }
+	if (0) { case GL_FLOAT_MAT2: components= 4; }
+	if (0) { case GL_FLOAT_MAT3: components= 9; }
+	if (0) { case GL_FLOAT_MAT2x3: case GL_FLOAT_MAT3x2: components= 6; }
+	if (0) { case GL_FLOAT_MAT2x4: case GL_FLOAT_MAT4x2: components= 8; }
+	if (0) { case GL_FLOAT_MAT3x4: case GL_FLOAT_MAT4x3: components= 12; }
+	if (0) { case GL_FLOAT_MAT4: components= 16; }
+		component_type= GL_FLOAT;
+		buf_req= components * size * sizeof(GLfloat);
+		break;
+	default:
+		croak("Can't assign uniform '%s', unknown type %d", name, type);
+	}
+	
+	if (Inline_Stack_Items == 3 + components * size) {
+		array= NULL;
+	}
+	else if (Inline_Stack_Items == 4 && SvROK(Inline_Stack_Item(3))) {
+		if (sv_isa(Inline_Stack_Item(3), "OpenGL::Array")) {
+			croak("OpenGL::Array objects are not yet handled");
+		}
+		else if (SvTYPE(SvRV(Inline_Stack_Item(3))) == SVt_PVAV) {
+			array= (AV*) SvRV(Inline_Stack_Item(3));
+			if (av_len(array) != components * size)
+				croak("Uniform %s is type %s, requiring %d values (got %d)", name, get_glsl_type_name(type), components*size, Inline_Stack_Items-3);
+		}
+		else
+			croak("Don't know how to extract values from %s", SvPV_nolen(Inline_Stack_Item(3)));
+	}
+	else {
+		croak("Uniform %s is type %s, requiring %d values (got %d)", name, get_glsl_type_name(type), components*size, Inline_Stack_Items-3);
+	}
+	
+	if (buf_req <= sizeof(static_buf))
+		buf= static_buf; /* use stack buffer if large enough */
+	else {
+		Newx(buf, buf_req, char);
+		SAVEFREEPV(buf); /* perl frees it for us */
+	}
+	if (component_type == GL_FLOAT) {
+		for (i= 0; i < components; i++) {
+			if (array) {
+				entry= av_fetch(array, i, 0);
+				s= entry? *entry : NULL;
+			} else {
+				s= Inline_Stack_Item(3+i);
+			}
+			if (!s || !SvOK(s)) croak("Undef encountered in uniform values");
+			((float*)buf)[i]= SvNV(s);
+		}
+	}
+	else {
+		croak("Unimplemented");
+	}
 	Inline_Stack_Void;
 }
+
+#endif
