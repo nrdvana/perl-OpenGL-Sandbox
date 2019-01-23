@@ -276,49 +276,83 @@ void set_uniform(unsigned program, SV* uniform_cache, const char *name, ...) {
 	int type= 0, component_type, size= 0, loc= 0, components= 0, buf_req= 0, i;
 	char static_buf[ 8 * 16 ], *buf;
 	AV *info= NULL, *array= NULL;
-	
+
 	/* Lazy-build the uniform cache */
 	if (!SvROK(uniform_cache) || !SvOK(SvRV(uniform_cache)) || SvTYPE(SvRV(uniform_cache)) != SVt_PVHV) {
 		sv_setsv( uniform_cache, get_program_uniforms(program) );
 	}
-	
+
+	/* Find uniform details by name */
 	entry= hv_fetch((HV*) SvRV(uniform_cache), name, strlen(name), 0);
 	if (!entry || !*entry || !SvROK(*entry))
 		croak("No active uniform '%s' in program %d", name, program);
-	
 	if (SvTYPE(SvRV(*entry)) != SVt_PVAV || av_len(info= (AV*) SvRV(*entry)) < 3)
 		croak("Invalid uniform info record for %s", name);
-	
+
+	/* Validate the uniform metadata */
 	entry= av_fetch(info, 1, 0);
 	if (!entry || !*entry || !SvIOK(*entry)) croak("Invalid uniform info record for %s", name);
 	loc= SvIV(*entry);
-	
 	entry= av_fetch(info, 2, 0);
 	if (!entry || !*entry || !SvIOK(*entry)) croak("Invalid uniform info record for %s", name);
 	type= SvIV(*entry);
-	
 	entry= av_fetch(info, 3, 0);
 	if (!entry || !*entry || !SvIOK(*entry)) croak("Invalid uniform info record for %s", name);
 	size= SvIV(*entry);
-	
+
+	/* Determine how many and what type of arguments we want based on type */
 	switch (type) {
-	if (0) { case GL_FLOAT: components= 1; }
+	         case GL_FLOAT: components= 1;
 	if (0) { case GL_FLOAT_VEC2: components= 2; }
 	if (0) { case GL_FLOAT_VEC3: components= 3; }
 	if (0) { case GL_FLOAT_VEC4: components= 4; }
 	if (0) { case GL_FLOAT_MAT2: components= 4; }
 	if (0) { case GL_FLOAT_MAT3: components= 9; }
+	if (0) { case GL_FLOAT_MAT4: components= 16; }
+	#ifdef GL_FLOAT_MAT2x3
 	if (0) { case GL_FLOAT_MAT2x3: case GL_FLOAT_MAT3x2: components= 6; }
 	if (0) { case GL_FLOAT_MAT2x4: case GL_FLOAT_MAT4x2: components= 8; }
 	if (0) { case GL_FLOAT_MAT3x4: case GL_FLOAT_MAT4x3: components= 12; }
-	if (0) { case GL_FLOAT_MAT4: components= 16; }
+	#endif
 		component_type= GL_FLOAT;
 		buf_req= components * size * sizeof(GLfloat);
 		break;
+	         case GL_INT:      case GL_BOOL:      components= 1;
+	if (0) { case GL_INT_VEC2: case GL_BOOL_VEC2: components= 2; }
+	if (0) { case GL_INT_VEC3: case GL_BOOL_VEC3: components= 3; }
+	if (0) { case GL_INT_VEC4: case GL_BOOL_VEC4: components= 4; }
+		component_type= GL_INT;
+		buf_req= components * size * sizeof(GLint);
+		break;
+	#ifdef GL_VERSION_2_1
+	         case GL_UNSIGNED_INT: components= 1;
+	if (0) { case GL_UNSIGNED_INT_VEC2: components= 2; }
+	if (0) { case GL_UNSIGNED_INT_VEC3: components= 3; }
+	if (0) { case GL_UNSIGNED_INT_VEC4: components= 4; }
+		component_type= GL_UNSIGNED_INT;
+		buf_req= components * size * sizeof(GLint);
+		break;
+	#endif
+	#ifdef GL_VERSION_4_1
+	         case GL_DOUBLE: components= 1;
+	if (0) { case GL_DOUBLE_VEC2: components= 2; }
+	if (0) { case GL_DOUBLE_VEC3: components= 3; }
+	if (0) { case GL_DOUBLE_VEC4: components= 4; }
+	if (0) { case GL_DOUBLE_MAT2: components= 4; }
+	if (0) { case GL_DOUBLE_MAT3: components= 9; }
+	if (0) { case GL_DOUBLE_MAT4: components= 16; }
+	if (0) { case GL_DOUBLE_MAT2x3: case GL_DOUBLE_MAT3x2: components= 6; }
+	if (0) { case GL_DOUBLE_MAT2x4: case GL_DOUBLE_MAT4x2: components= 8; }
+	if (0) { case GL_DOUBLE_MAT3x4: case GL_DOUBLE_MAT4x3: components= 12; }
+		component_type= GL_DOUBLE;
+		buf_req= components * size * sizeof(GLdouble);
+		break;
+	#endif
 	default:
-		croak("Can't assign uniform '%s', unknown type %d", name, type);
+		croak("Unimplemented type %d for uniform %s", type, name);
 	}
-	
+
+	/* Check whether user gave us the right type and number of arguments */
 	if (Inline_Stack_Items == 3 + components * size) {
 		array= NULL;
 	}
@@ -337,27 +371,76 @@ void set_uniform(unsigned program, SV* uniform_cache, const char *name, ...) {
 	else {
 		croak("Uniform %s is type %s, requiring %d values (got %d)", name, get_glsl_type_name(type), components*size, Inline_Stack_Items-3);
 	}
-	
+
+	/* If not packed into an OpenGL::Array, round up the data and pack it into one of our own */
 	if (buf_req <= sizeof(static_buf))
 		buf= static_buf; /* use stack buffer if large enough */
 	else {
 		Newx(buf, buf_req, char);
 		SAVEFREEPV(buf); /* perl frees it for us */
 	}
-	if (component_type == GL_FLOAT) {
-		for (i= 0; i < components; i++) {
-			if (array) {
-				entry= av_fetch(array, i, 0);
-				s= entry? *entry : NULL;
-			} else {
-				s= Inline_Stack_Item(3+i);
-			}
-			if (!s || !SvOK(s)) croak("Undef encountered in uniform values");
-			((float*)buf)[i]= SvNV(s);
+	for (i= 0; i < components; i++) {
+		if (array) {
+			entry= av_fetch(array, i, 0);
+			s= entry? *entry : NULL;
+		} else {
+			s= Inline_Stack_Item(3+i);
+		}
+		if (!s || !SvOK(s)) croak("Undef encountered in uniform values");
+		switch (component_type) {
+		case GL_INT:          ((GLint*)buf)[i]= SvIV(s); break;
+		case GL_UNSIGNED_INT: ((GLuint*)buf)[i]= SvUV(s); break;
+		case GL_FLOAT:        ((GLfloat*)buf)[i]= SvNV(s); break;
+		#ifdef GL_VERSION_4_1
+		case GL_DOUBLE:       ((GLdouble*)buf)[i]= SvNV(s); break;
+		#endif
+		default: croak("Unimplemented");
 		}
 	}
-	else {
-		croak("Unimplemented");
+
+	/* Finally, call glUniform depending on the type */
+	switch (type) {
+	case GL_INT:      case GL_BOOL:      glUniform1iv(loc, size, (GLint*) buf); break;
+	case GL_INT_VEC2: case GL_BOOL_VEC2: glUniform2iv(loc, size, (GLint*) buf); break;
+	case GL_INT_VEC3: case GL_BOOL_VEC3: glUniform3iv(loc, size, (GLint*) buf); break;
+	case GL_INT_VEC4: case GL_BOOL_VEC4: glUniform4iv(loc, size, (GLint*) buf); break;
+	#ifdef GL_VERSION_2_1
+	case GL_UNSIGNED_INT:      glUniform1uiv(loc, size, (GLuint*) buf); break;
+	case GL_UNSIGNED_INT_VEC2: glUniform2uiv(loc, size, (GLuint*) buf); break;
+	case GL_UNSIGNED_INT_VEC3: glUniform3uiv(loc, size, (GLuint*) buf); break;
+	case GL_UNSIGNED_INT_VEC4: glUniform4uiv(loc, size, (GLuint*) buf); break;
+	#endif
+	case GL_FLOAT:        glUniform1fv(loc, size, (GLfloat*) buf); break;
+	case GL_FLOAT_VEC2:   glUniform2fv(loc, size, (GLfloat*) buf); break;
+	case GL_FLOAT_VEC3:   glUniform3fv(loc, size, (GLfloat*) buf); break;
+	case GL_FLOAT_VEC4:   glUniform4fv(loc, size, (GLfloat*) buf); break;
+	case GL_FLOAT_MAT2:   glUniformMatrix2fv(loc, size, 0, (GLfloat*) buf); break;
+	case GL_FLOAT_MAT3:   glUniformMatrix3fv(loc, size, 0, (GLfloat*) buf); break;
+	case GL_FLOAT_MAT4:   glUniformMatrix4fv(loc, size, 0, (GLfloat*) buf); break;
+	#ifdef GL_FLOAT_MAT2x3
+	case GL_FLOAT_MAT2x3: glUniformMatrix2x3fv(loc, size, 0, (GLfloat*) buf); break;
+	case GL_FLOAT_MAT3x2: glUniformMatrix3x2fv(loc, size, 0, (GLfloat*) buf); break;
+	case GL_FLOAT_MAT2x4: glUniformMatrix2x4fv(loc, size, 0, (GLfloat*) buf); break;
+	case GL_FLOAT_MAT4x2: glUniformMatrix4x2fv(loc, size, 0, (GLfloat*) buf); break;
+	case GL_FLOAT_MAT3x4: glUniformMatrix3x4fv(loc, size, 0, (GLfloat*) buf); break;
+	case GL_FLOAT_MAT4x3: glUniformMatrix4x3fv(loc, size, 0, (GLfloat*) buf); break;
+	#endif
+	#ifdef GL_VERSION_4_1
+	case GL_DOUBLE:        glUniform1dv(loc, size, (GLdouble*) buf); break;
+	case GL_DOUBLE_VEC2:   glUniform2dv(loc, size, (GLdouble*) buf); break;
+	case GL_DOUBLE_VEC3:   glUniform3dv(loc, size, (GLdouble*) buf); break;
+	case GL_DOUBLE_VEC4:   glUniform4dv(loc, size, (GLdouble*) buf); break;
+	case GL_DOUBLE_MAT2:   glUniformMatrix2dv(loc, size, 0, (GLdouble*) buf); break;
+	case GL_DOUBLE_MAT3:   glUniformMatrix3dv(loc, size, 0, (GLdouble*) buf); break;
+	case GL_DOUBLE_MAT4:   glUniformMatrix4dv(loc, size, 0, (GLdouble*) buf); break;
+	case GL_DOUBLE_MAT2x3: glUniformMatrix2x3dv(loc, size, 0, (GLdouble*) buf); break;
+	case GL_DOUBLE_MAT3x2: glUniformMatrix3x2dv(loc, size, 0, (GLdouble*) buf); break;
+	case GL_DOUBLE_MAT2x4: glUniformMatrix2x4dv(loc, size, 0, (GLdouble*) buf); break;
+	case GL_DOUBLE_MAT4x2: glUniformMatrix4x2dv(loc, size, 0, (GLdouble*) buf); break;
+	case GL_DOUBLE_MAT3x4: glUniformMatrix3x4dv(loc, size, 0, (GLdouble*) buf); break;
+	case GL_DOUBLE_MAT4x3: glUniformMatrix4x3dv(loc, size, 0, (GLdouble*) buf); break;
+	#endif
+	default: croak("Unimplemented type %d for uniform %s", type, name);
 	}
 	Inline_Stack_Void;
 }
