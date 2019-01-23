@@ -15,6 +15,7 @@ use Scalar::Util ();
 =head1 SYNOPSIS
 
   my $r= OpenGL::Sandbox::ResMan->default_instance;
+  $r->path( $path );
   my $tex= $r->tex('foo');
   my $font= $r->font('default');
 
@@ -32,7 +33,7 @@ currently.  Other font providers might be added later.
 
 =head1 ATTRIBUTES
 
-=head2 resource_root_dir
+=head2 path
 
 The path where resources are located, adhering to the basic layout of:
 
@@ -102,7 +103,8 @@ Example program_config
 
 =cut
 
-has resource_root_dir => ( is => 'rw', default => sub { '.' } );
+has path              => ( is => 'rw', default => sub { '.' } );
+*resource_root_dir= *path; # back-compat name
 has font_config       => ( is => 'rw', default => sub { +{} } );
 has tex_config        => ( is => 'rw', default => sub { +{} } );
 has shader_config     => ( is => 'rw', default => sub { +{} } );
@@ -137,13 +139,13 @@ has _shader_cache      => ( is => 'ro', default => sub { +{} } );
 has _program_cache     => ( is => 'ro', default => sub { +{} } );
 
 sub _build__texture_dir_cache {
-	$_[0]->_cache_directory(catdir($_[0]->resource_root_dir, 'tex'), $_[0]->tex_fmt_priority)
+	$_[0]->_cache_directory(catdir($_[0]->path, 'tex'), $_[0]->tex_fmt_priority)
 }
 sub _build__font_dir_cache {
-	$_[0]->_cache_directory(catdir($_[0]->resource_root_dir, 'font'));
+	$_[0]->_cache_directory(catdir($_[0]->path, 'font'));
 }
 sub _build__shader_dir_cache {
-	$_[0]->_cache_directory(catdir($_[0]->resource_root_dir, 'shader'));
+	$_[0]->_cache_directory(catdir($_[0]->path, 'shader'));
 }
 
 =head1 METHODS
@@ -155,7 +157,7 @@ Standard Moo constructor.  Also validates the resource directory by loading
 
 =head2 default_instance
 
-Return a default instance which uses the current directory as "resource_root_dir".
+Return a default instance which uses the current directory as "path".
 
 =cut
 

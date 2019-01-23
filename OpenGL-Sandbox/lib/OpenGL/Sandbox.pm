@@ -86,7 +86,7 @@ module's namespace.  i.e. C<< OpenGL::Sandbox::GL_TRUE() >> does not work.
 =head2 $res
 
 Returns a default global instance of the L<resource manager|OpenGL::Sandbox::ResMan>
-with C<resource_root_dir> pointing to the current directory.
+with C<path> pointing to the current directory.
 
 =head2 tex
 
@@ -129,7 +129,7 @@ This *only* exports the symbols defined by this module collection, *not* every O
 
 =cut
 
-export qw( =$res font tex shader program
+export qw( =$res -resources(1) font tex shader program
 	make_context current_context next_frame
 	gl_error_name get_gl_errors log_gl_errors warn_gl_errors
 	gen_textures delete_texture round_up_pow2
@@ -142,6 +142,15 @@ export qw( =$res font tex shader program
 
 # Called when exporting '$res'
 sub _generateScalar_res { \OpenGL::Sandbox::ResMan->default_instance; }
+
+sub resources {
+	my ($self, $config)= @_;
+	ref $config eq 'HASH' or croak "Expected hashref argument for -resources";
+	my $res= OpenGL::Sandbox::ResMan->default_instance;
+	for (keys %$config) {
+		$res->can($_)? $res->$_($config->{$_}) : carp "No such ResMan attribute '$_'";
+	}
+}
 
 sub exporter_autoload_symbol {
 	my ($self, $sym)= @_;

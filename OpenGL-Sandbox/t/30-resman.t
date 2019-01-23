@@ -13,7 +13,11 @@ plan skip_all => "Can't create an OpenGL context: $@"
 	unless $ctx;
 
 my $res= OpenGL::Sandbox::ResMan->default_instance;
-$res->resource_root_dir(catdir($FindBin::Bin, 'data'));
+
+# ResMan can be configured direct from OpenGL::Sandbox
+OpenGL::Sandbox->import(-resources => { path => catdir($FindBin::Bin, 'data') });
+is( $res->path, catdir($FindBin::Bin, 'data'), 'path was changed' );
+
 $res->tex_config({
 	default => '8x8',
 });
@@ -21,6 +25,7 @@ $res->tex_config({
 my $imported_res= eval 'package Test::Ns1; use OpenGL::Sandbox q{$res}; $res';
 is( $imported_res, $res, 'can import resource manager' )
 	or diag $@;
+
 
 # Can't run font tests without a separate font module
 #$res->font_config({
