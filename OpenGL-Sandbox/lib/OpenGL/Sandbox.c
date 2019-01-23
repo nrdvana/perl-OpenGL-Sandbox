@@ -296,7 +296,7 @@ void set_uniform(unsigned program, SV* uniform_cache, const char *name, ...) {
 	Inline_Stack_Vars;
 	SV **entry, *s;
 	int type= 0, component_type, size= 0, loc= 0, components= 0, buf_req= 0, i, cur_prog;
-	char static_buf[ 8 * 16 ], *buf;
+	char static_buf[ 8 * 16 ], *buf= NULL;
 	AV *info= NULL, *array= NULL;
 	
 	/* Can't call glUniform for a program that isn't the active one, unless GL > 4.1 */
@@ -385,48 +385,74 @@ void set_uniform(unsigned program, SV* uniform_cache, const char *name, ...) {
 	}
 
 	/* Check whether user gave us the right type and number of arguments */
-	if (Inline_Stack_Items == 3 + components * size) {
-		array= NULL;
-	}
-	else if (Inline_Stack_Items == 4 && SvROK(Inline_Stack_Item(3))) {
-		if (sv_isa(Inline_Stack_Item(3), "OpenGL::Array")) {
-			croak("OpenGL::Array objects are not yet handled");
+	if (Inline_Stack_Items > 3 && SvROK(Inline_Stack_Item(3))) {
+		s= Inline_Stack_Item(3);
+		if (sv_isa(s, "OpenGL::Array")) {
+			/* User may pass pointer as second argument, and we use it directly */
+			if (Inline_Stack_Items == 5) {
+				buf= SvIV(Inline_Stack_Item(4));
+			}
+			else if (Inline_Stack_Items == 4) {
+				/* OpenGL::Array has an internal struct and the only way to correctly
+				 * access its ->data field is by calling the perl method ->ptr */
+				ENTER;
+				SAVETMPS;
+				PUSHMARK(SP);
+				EXTEND(SP, 2);
+				PUSHs(sv_mortalcopy(s));
+				PUTBACK;
+				if (call_method("ptr", G_SCALAR) != 1)
+					croak("stack assertion failed");
+				SPAGAIN;
+				buf= POPi;
+				PUTBACK;
+				FREETMPS;
+				LEAVE;
+			}
+			else
+				croak("Unexpected extra arguments following OpenGL::Array");
+			if (!buf)
+				croak("Null pointer given for values");
 		}
-		else if (SvTYPE(SvRV(Inline_Stack_Item(3))) == SVt_PVAV) {
-			array= (AV*) SvRV(Inline_Stack_Item(3));
-			if (av_len(array) != components * size)
-				croak("Uniform %s is type %s, requiring %d values (got %d)", name, get_glsl_type_name(type), components*size, Inline_Stack_Items-3);
+		else if (SvTYPE(SvRV(s)) == SVt_PVAV) {
+			if (Inline_Stack_Items > 4)
+				croak("Unexpected extra arguments following ARRAY");
+			array= (AV*) SvRV(s);
+			if (av_len(array)+1 != components * size)
+				croak("Uniform %s is type %s, requiring %d values (got %d)", name, get_glsl_type_name(type), components*size, av_len(array)+1);
 		}
 		else
-			croak("Don't know how to extract values from %s", SvPV_nolen(Inline_Stack_Item(3)));
+			croak("Don't know how to extract values from %s", SvPV_nolen(s));
 	}
-	else {
+	else if (Inline_Stack_Items != 3 + components * size)
 		croak("Uniform %s is type %s, requiring %d values (got %d)", name, get_glsl_type_name(type), components*size, Inline_Stack_Items-3);
-	}
 
-	/* If not packed into an OpenGL::Array, round up the data and pack it into one of our own */
-	if (buf_req <= sizeof(static_buf))
-		buf= static_buf; /* use stack buffer if large enough */
-	else {
-		Newx(buf, buf_req, char);
-		SAVEFREEPV(buf); /* perl frees it for us */
-	}
-	for (i= 0; i < components; i++) {
-		if (array) {
-			entry= av_fetch(array, i, 0);
-			s= entry? *entry : NULL;
-		} else {
-			s= Inline_Stack_Item(3+i);
+	/* If not given a packed buffer, round up the data and pack it into one of our own */
+	if (!buf) {
+		if (buf_req <= sizeof(static_buf))
+			buf= static_buf; /* use stack buffer if large enough */
+		else {
+			Newx(buf, buf_req, char);
+			SAVEFREEPV(buf); /* perl frees it for us */
 		}
-		if (!s || !SvOK(s)) croak("Undef encountered in uniform values");
-		switch (component_type) {
-		case GL_INT:          ((GLint*)buf)[i]= SvIV(s); break;
-		case GL_UNSIGNED_INT: ((GLuint*)buf)[i]= SvUV(s); break;
-		case GL_FLOAT:        ((GLfloat*)buf)[i]= SvNV(s); break;
-		#ifdef GL_VERSION_4_1
-		case GL_DOUBLE:       ((GLdouble*)buf)[i]= SvNV(s); break;
-		#endif
-		default: croak("Unimplemented");
+		for (i= 0; i < components; i++) {
+			if (array) {
+				entry= av_fetch(array, i, 0);
+				s= entry? *entry : NULL;
+			} else {
+				s= Inline_Stack_Item(3+i);
+			}
+			if (!s || !SvOK(s))
+				croak("Undef encountered in uniform values");
+			switch (component_type) {
+			case GL_INT:          ((GLint*)buf)[i]= SvIV(s); break;
+			case GL_UNSIGNED_INT: ((GLuint*)buf)[i]= SvUV(s); break;
+			case GL_FLOAT:        ((GLfloat*)buf)[i]= SvNV(s); break;
+			#ifdef GL_VERSION_4_1
+			case GL_DOUBLE:       ((GLdouble*)buf)[i]= SvNV(s); break;
+			#endif
+			default: croak("Unimplemented");
+			}
 		}
 	}
 

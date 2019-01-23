@@ -74,6 +74,7 @@ sub _build_uniforms {
 sub set_uniform {
 	my $self= shift;
 	OpenGL::Sandbox::set_uniform($self->id, $self->uniforms, @_);
+	$self;
 }
 
 1;
