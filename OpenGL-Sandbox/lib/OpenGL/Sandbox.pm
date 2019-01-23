@@ -131,7 +131,7 @@ This *only* exports the symbols defined by this module collection, *not* every O
 
 export qw( =$res font tex shader program
 	make_context current_context next_frame
-	get_gl_errors log_gl_errors warn_gl_errors
+	gl_error_name get_gl_errors log_gl_errors warn_gl_errors
 	gen_textures delete_texture round_up_pow2
 	),
 	-V1 => sub { Module::Runtime::use_module('OpenGL::Sandbox::V1','0.04'); },
@@ -315,38 +315,32 @@ sub next_frame() {
 	__PACKAGE__->maybe::next::method();
 }
 
+=head2 gl_error_name
+
+  my $name= gl_error_name( $code );
+
+Returns the symbolic name of a GL error code.
+
 =head2 get_gl_errors
+
+  my @names= get_gl_errors();
 
 Returns the symbolic names of any pending OpenGL errors, as a list.
 
 =head2 log_gl_errors
 
-Write all GL errors to Log::Any as C<< ->error >>
+Write all GL errors to Log::Any as C<< ->error >>.  Returns true if any errors were reported.
 
 =head2 warn_gl_errors
 
-Emit any GL errors using 'warn'
+Emit any GL errors using 'warn'.  Returns true if any errors were reported.
 
 =cut
-
-our %_gl_err_msg;
-BEGIN {
-	%_gl_err_msg= map { my $v= eval "$OpenGLModule->import('$_'); $_()"; defined $v? ($v => $_) : () } qw(
-		GL_INVALID_ENUM
-		GL_INVALID_VALUE
-		GL_INVALID_OPERATION
-		GL_INVALID_FRAMEBUFFER_OPERATION
-		GL_OUT_OF_MEMORY
-		GL_STACK_OVERFLOW
-		GL_STACK_UNDERFLOW
-		GL_TABLE_TOO_LARGE
-	);
-}
 
 sub get_gl_errors {
 	my $self= shift;
 	my (@names, $e);
-	push @names, $_gl_err_msg{$e} || "(unrecognized) ".$e
+	push @names, gl_error_name($e) || "(unrecognized) ".$e
 		while (($e= glGetError()));
 	return @names;
 }
