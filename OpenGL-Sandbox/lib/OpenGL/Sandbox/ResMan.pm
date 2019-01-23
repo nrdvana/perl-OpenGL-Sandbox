@@ -88,12 +88,12 @@ Example shader_config:
     vpassthrough => { filename => 'vertex-passthrough.vert', type => GL_VERTEX_SHADER },
   }
 
-=head2 shader_program_config
+=head2 program_config
 
-A hashref of program (pipeline) names which holds default L<OpenGL::Sandbox::ShaderProgram|program>
+A hashref of program (pipeline) names which holds default L<OpenGL::Sandbox::Program|program>
 constructor options.  The hash key of C<'*'> can be used to apply default values to every program.
 
-Example shader_program_config
+Example program_config
 
   {
     '*' => { shaders => { vertex => 'vpassthrough', fragment => 'aurora' } },
@@ -106,7 +106,7 @@ has resource_root_dir => ( is => 'rw', default => sub { '.' } );
 has font_config       => ( is => 'rw', default => sub { +{} } );
 has tex_config        => ( is => 'rw', default => sub { +{} } );
 has shader_config     => ( is => 'rw', default => sub { +{} } );
-has shader_program_config => ( is => 'rw', default => sub { +{} } );
+has program_config    => ( is => 'rw', default => sub { +{} } );
 has tex_fmt_priority  => ( is => 'rw', lazy => 1, builder => 1 );
 has tex_default_fmt   => ( is => 'rw', lazy => 1, builder => 1 );
 
@@ -134,7 +134,7 @@ has _texture_cache     => ( is => 'ro', default => sub { +{} } );
 has _texture_dir_cache => ( is => 'lazy', clearer => 1 );
 has _shader_dir_cache  => ( is => 'lazy', clearer => 1 );
 has _shader_cache      => ( is => 'ro', default => sub { +{} } );
-has _shader_program_cache => ( is => 'ro', default => sub { +{} } );
+has _program_cache     => ( is => 'ro', default => sub { +{} } );
 
 sub _build__texture_dir_cache {
 	$_[0]->_cache_directory(catdir($_[0]->resource_root_dir, 'tex'), $_[0]->tex_fmt_priority)
@@ -369,11 +369,11 @@ sub _load_shader {
 	};
 }
 
-=head2 shader_program
+=head2 program
 
-  my $prog= $res->shader_program( $name );
+  my $prog= $res->program( $name );
 
-Return a named shader program.  The settings come from L</shader_program_config>, but if that
+Return a named shader program.  The settings come from L</program_config>, but if that
 does not specify C<shaders>, this will look through the C<< shaders/ >> directory for every
 shader that begins with this name.  For example, if the directory contains:
 
@@ -389,22 +389,22 @@ OpenGL context can't support them.
 
 =cut
 
-sub shader_program {
-	require OpenGL::Sandbox::ShaderProgram;
+sub program {
+	require OpenGL::Sandbox::Program;
 	no warnings 'redefine';
-	*shader_program= *_load_shader_program;
-	shift->_load_shader_program(@_);
+	*program= *_load_program;
+	shift->_load_program(@_);
 }
-sub _load_shader_program {
+sub _load_program {
 	my ($self, $name, %options)= @_;
-	return $self->_shader_program_cache->{$name} //= do {
+	return $self->_program_cache->{$name} //= do {
 		$log->debug("loading shader program (pipeline) $name");
-		my $name_cfg= $self->shader_program_config->{$name} // {};
+		my $name_cfg= $self->program_config->{$name} // {};
 		# Check for alias
-		!ref $name_cfg? $self->_load_shader_program($name_cfg)
+		!ref $name_cfg? $self->_load_program($name_cfg)
 		: do {
 			# Merge options, configured options, and configured defaults
-			my $default_cfg= $self->shader_program_config->{'*'} // {};
+			my $default_cfg= $self->program_config->{'*'} // {};
 			# Find shaders with same base name as this program, unless they were
 			# specifically given by %options or %$name_cfg
 			my %shaders= $options{shaders}? %{$options{shaders}}
@@ -419,7 +419,7 @@ sub _load_shader_program {
 			# Now, translate the shader names into shader objects
 			$_= $self->load_shader($_)
 				for values %shaders;
-			OpenGL::Sandbox::ShaderProgram->new(
+			OpenGL::Sandbox::Program->new(
 				%$default_cfg, %$name_cfg, %options, shaders => \%shaders
 			);
 		}
@@ -443,7 +443,7 @@ sub clear_cache {
 	%{ $self->_font_cache }= ();
 	%{ $self->_fontdata_cache }= ();
 	$self->_clear_font_dir_cache;
-	%{ $self->_shader_program_cache }= ();
+	%{ $self->_program_cache }= ();
 	%{ $self->_shader_cache }= ();
 	$self->_clear_shader_dir_cache;
 }

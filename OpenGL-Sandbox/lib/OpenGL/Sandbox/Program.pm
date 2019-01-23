@@ -1,25 +1,25 @@
-package OpenGL::Sandbox::ShaderProgram;
+package OpenGL::Sandbox::Program;
 use Moo;
 use Carp;
 use Try::Tiny;
 use OpenGL::Sandbox::MMap;
-our @ISA= 'OpenGL::Sandbox::ShaderProgram::Trampoline';
+our @ISA= 'OpenGL::Sandbox::Program::Trampoline';
 
 sub choose_implementation {
 	my $jump_to_method= shift;
 	@ISA= ();
-	eval { extends 'OpenGL::Sandbox::ShaderProgram::V4'; 1; }
+	eval { extends 'OpenGL::Sandbox::Program::V4'; 1; }
 	or croak "Your OpenGL does not support version-4 shaders\n".$@;
 	return shift->$jump_to_method(@_) if $jump_to_method;
 	return 1;
 }
 
-sub OpenGL::Sandbox::ShaderProgram::Trampoline::_build_id { choose_implementation('_build_id', @_) }
-sub OpenGL::Sandbox::ShaderProgram::Trampoline::_activate { choose_implementation('_activate', @_) }
-sub OpenGL::Sandbox::ShaderProgram::Trampoline::_assemble { choose_implementation('_assemble', @_) }
-sub OpenGL::Sandbox::ShaderProgram::Trampoline::_disassemble { choose_implementation('_disassemble', @_) }
-sub OpenGL::Sandbox::ShaderProgram::Trampoline::_attr_by_name { choose_implementation('_attr_by_name', @_) }
-sub OpenGL::Sandbox::ShaderProgram::Trampoline::_uniform_by_name { choose_implementation('_uniform_by_name', @_) }
+sub OpenGL::Sandbox::Program::Trampoline::_build_id { choose_implementation('_build_id', @_) }
+sub OpenGL::Sandbox::Program::Trampoline::_activate { choose_implementation('_activate', @_) }
+sub OpenGL::Sandbox::Program::Trampoline::_assemble { choose_implementation('_assemble', @_) }
+sub OpenGL::Sandbox::Program::Trampoline::_disassemble { choose_implementation('_disassemble', @_) }
+sub OpenGL::Sandbox::Program::Trampoline::_attr_by_name { choose_implementation('_attr_by_name', @_) }
+sub OpenGL::Sandbox::Program::Trampoline::_uniform_by_name { choose_implementation('_uniform_by_name', @_) }
 
 # ABSTRACT: Wrapper object for OpenGL shader program pipeline
 # VERSION

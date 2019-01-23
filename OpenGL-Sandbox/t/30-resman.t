@@ -39,8 +39,8 @@ $res->tex('8x8')->load;
 is( $res->tex('8x8')->width, 8, 'width=8' );
 
 isa_ok( $res->shader('zero.frag'), 'OpenGL::Sandbox::Shader', 'load a shader' );
-isa_ok( $res->shader_program('zero'), 'OpenGL::Sandbox::ShaderProgram', 'load a shader program' );
-like( $res->shader_program('zero')->shaders->{vert}->filename, qr/zero.vert$/, 'found vert shader of prog "zero"' );
-like( $res->shader_program('zero')->shaders->{frag}->filename, qr/zero.frag$/, 'found frag shader of prog "zero"' );
+isa_ok( $res->program('zero'), 'OpenGL::Sandbox::Program', 'load a shader program' );
+like( $res->program('zero')->shaders->{vert}->filename, qr/zero.vert$/, 'found vert shader of prog "zero"' );
+like( $res->program('zero')->shaders->{frag}->filename, qr/zero.frag$/, 'found frag shader of prog "zero"' );
 
 done_testing;

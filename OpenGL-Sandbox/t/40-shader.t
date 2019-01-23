@@ -8,14 +8,14 @@ use lib "$FindBin::Bin/lib";
 use Log::Any::Adapter 'TAP';
 use OpenGL::Sandbox qw/ make_context get_gl_errors GL_FLOAT /;
 use OpenGL::Sandbox::Shader;
-use OpenGL::Sandbox::ShaderProgram;
+use OpenGL::Sandbox::Program;
 
 plan skip_all => "Can't create an OpenGL context: $@"
 	unless eval { make_context(); 1 };
 
 plan skip_all => "No support for modern shaders in this OpenGL context: $@"
 	unless eval { OpenGL::Sandbox::Shader::choose_implementation }
-		and eval { OpenGL::Sandbox::ShaderProgram::choose_implementation };
+		and eval { OpenGL::Sandbox::Program::choose_implementation };
 
 OpenGL::Sandbox->import('GL_FLOAT_MAT4');
 
@@ -43,7 +43,7 @@ sub test_vertex_shader {
 
 subtest shader_program => \&test_shader_program;
 sub test_shader_program {
-	my $prog= new_ok( 'OpenGL::Sandbox::ShaderProgram', [ name => 'Test' ], shaders => {} );
+	my $prog= new_ok( 'OpenGL::Sandbox::Program', [ name => 'Test' ], shaders => {} );
 	$prog->{shaders}{vertex}= OpenGL::Sandbox::Shader->new(filename => 'demo.vert', source => $simple_vertex_shader);
 	$prog->{shaders}{fragment}= OpenGL::Sandbox::Shader->new(filename => 'demo.frag', source => $simple_fragment_shader);
 	ok( eval { $prog->assemble; 1 }, 'compiled GL shader pipeline' )

@@ -44,6 +44,12 @@ require constant;
   font('Arial.ttf')->render("Hello World");
   next_frame;
 
+(or, modern stuff)
+
+  use OpenGL::Sandbox qw( :all );
+  make_context;
+  program('demo')->activate->set_uniform('projection', 1,2,3);
+
 =head1 DESCRIPTION
 
 This module collection aims to provide quick and easy access to OpenGL, for use in one-liners
@@ -96,16 +102,16 @@ currently.  Other font providers might be added later.
 
 Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->shader >>
 
-=head2 shader_program
+=head2 program
 
-Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->shader_program >>
+Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->program >>
 
 =cut
 
 sub tex  { OpenGL::Sandbox::ResMan->default_instance->tex(@_) }
 sub font { OpenGL::Sandbox::ResMan->default_instance->font(@_) }
 sub shader { OpenGL::Sandbox::ResMan->default_instance->shader(@_) }
-sub shader_program { OpenGL::Sandbox::ResMan->default_instance->shader_program(@_) }
+sub program { OpenGL::Sandbox::ResMan->default_instance->program(@_) }
 
 =head2 -V1
 
@@ -122,7 +128,8 @@ This *only* exports the symbols defined by this module collection, *not* every O
 
 =cut
 
-export qw( =$res font tex make_context current_context next_frame
+export qw( =$res font tex shader program
+	make_context current_context next_frame
 	get_gl_errors log_gl_errors warn_gl_errors
 	gen_textures delete_texture round_up_pow2
 	glGetString glGetError GL_VERSION

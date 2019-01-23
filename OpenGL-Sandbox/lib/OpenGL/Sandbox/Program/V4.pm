@@ -1,4 +1,4 @@
-package OpenGL::Sandbox::ShaderProgram::V4;
+package OpenGL::Sandbox::Program::V4;
 use Moo;
 use Carp;
 use OpenGL::Sandbox qw(
