@@ -3,23 +3,26 @@ use Moo;
 use Carp;
 use Try::Tiny;
 use OpenGL::Sandbox::MMap;
-our @ISA= 'OpenGL::Sandbox::Program::Trampoline';
-
-sub choose_implementation {
-	my $jump_to_method= shift;
-	@ISA= ();
-	eval { extends 'OpenGL::Sandbox::Program::V4'; 1; }
-	or croak "Your OpenGL does not support version-4 shaders\n".$@;
-	return shift->$jump_to_method(@_) if $jump_to_method;
-	return 1;
+use OpenGL::Sandbox qw(
+	warn_gl_errors
+	glCreateProgram glDeleteProgram glAttachShader glDetachShader glLinkProgram glUseProgram 
+	get_program_uniforms
+	GL_LINK_STATUS GL_FALSE GL_TRUE GL_CURRENT_PROGRAM GL_ACTIVE_UNIFORMS
+);
+BEGIN {
+	try {
+		OpenGL::Sandbox->import(qw( glGetIntegerv_p glGetProgramInfoLog_p glGetProgramiv_p ));
+	}
+	catch {
+		try {
+			require OpenGL::Modern::Helpers;
+			OpenGL::Modern::Helpers->import(qw( glGetIntegerv_p glGetProgramInfoLog_p glGetProgramiv_p ));
+		}
+		catch {
+			croak "Your OpenGL does not support version-4 shaders: ".$_;;
+		};
+	};
 }
-
-sub OpenGL::Sandbox::Program::Trampoline::_build_id { choose_implementation('_build_id', @_) }
-sub OpenGL::Sandbox::Program::Trampoline::_activate { choose_implementation('_activate', @_) }
-sub OpenGL::Sandbox::Program::Trampoline::_assemble { choose_implementation('_assemble', @_) }
-sub OpenGL::Sandbox::Program::Trampoline::_disassemble { choose_implementation('_disassemble', @_) }
-sub OpenGL::Sandbox::Program::Trampoline::_attr_by_name { choose_implementation('_attr_by_name', @_) }
-sub OpenGL::Sandbox::Program::Trampoline::_uniform_by_name { choose_implementation('_uniform_by_name', @_) }
 
 # ABSTRACT: Wrapper object for OpenGL shader program pipeline
 # VERSION
@@ -77,7 +80,23 @@ has id         => ( is => 'lazy', predicate => 1 );
 has shaders    => ( is => 'rw', default => sub { +{} } );
 sub shader_list { values %{ shift->shaders } }
 
+sub _build_id {
+	my $self= shift;
+	warn_gl_errors;
+	my $id= glCreateProgram();
+	$id && !warn_gl_errors or croak "glCreateProgram failed";
+	my $log= glGetProgramInfoLog_p($id);
+	warn "Shader Program ".$self->name.": ".$log
+		if $log;
+	$id;
+}
+
+has assembled  => ( is => 'rw' );
 has uniforms   => ( is => 'lazy', predicate => 1, clearer => 1 );
+
+sub _build_uniforms {
+	get_program_uniforms(shift->id);
+}
 
 has _attribute_cache => ( is => 'rw', default => sub { +{} } );
 
@@ -94,8 +113,10 @@ Returns C<$self> for convenient chaining.
 =cut
 
 sub activate {
-	$_[0]->_activate;
-	$_[0];
+	my $self= shift;
+	$self->_assemble unless $self->assembled;
+	glUseProgram($self->id);
+	return $self;
 }
 
 =head2 assemble
@@ -110,13 +131,31 @@ Returns C<$self> for convenient chaining.
 =cut
 
 sub assemble {
-	$_[0]->_assemble;
-	$_[0]
+	my $self= shift;
+	return if $self->assembled;
+	my $id= $self->id;
+	warn_gl_errors;
+	for ($self->shader_list) {
+		$_->load; # also compiles
+		glAttachShader($id, $_->id);
+		!warn_gl_errors
+			or croak "glAttachShader failed: ".glGetProgramInfoLog_p($id);
+	}
+    glLinkProgram($id);
+	!warn_gl_errors and glGetProgramiv_p($id, GL_LINK_STATUS) == GL_TRUE
+		or croak "glLinkProgram failed: ".glGetProgramInfoLog_p($id);
+	$self->assembled(1);
+	return $self;
 }
 
 sub disassemble {
-	$_[0]->_disassemble;
-	$_[0]
+	my $self= shift;
+	return unless $self->has_id && $self->assembled;
+	glUseProgram(0) if glGetIntegerv_p(GL_CURRENT_PROGRAM, 1) == $self->id;
+	$_->has_id && glDetachShader($self->id, $_->id) for $self->shader_list;
+	$self->clear_uniforms;
+	$self->assembled(0);
+	return $self;
 }
 
 =head2 attr_by_name
@@ -145,6 +184,21 @@ sub attr_by_name {
 sub uniform_location {
 	my ($self, $name)= @_;
 	($self->uniforms->{$name} // [])->[1];
+}
+
+
+sub set_uniform {
+	my $self= shift;
+	OpenGL::Sandbox::set_uniform($self->id, $self->uniforms, @_);
+	$self;
+}
+
+sub DESTROY {
+	my $self= shift;
+	if ($self->has_id) {
+		$self->disassemble;
+		glDeleteProgram(delete $self->{id});
+	}
 }
 
 1;

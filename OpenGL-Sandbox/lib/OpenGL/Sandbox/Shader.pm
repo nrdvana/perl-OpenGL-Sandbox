@@ -3,19 +3,23 @@ use Moo;
 use Carp;
 use Try::Tiny;
 use OpenGL::Sandbox::MMap;
-our @ISA= 'OpenGL::Sandbox::Shader::Trampoline';
-
-sub choose_implementation {
-	my $jump_to_method= shift;
-	@ISA= ();
-	eval { extends 'OpenGL::Sandbox::Shader::V4'; 1; }
-	or croak "Your OpenGL does not support version-4 shaders\n".$@;
-	return shift->$jump_to_method(@_) if $jump_to_method;
-	return 1;
+use OpenGL::Sandbox qw(
+	warn_gl_errors
+	glCreateShader glDeleteShader glCompileShader
+	GL_FRAGMENT_SHADER GL_VERTEX_SHADER GL_COMPILE_STATUS GL_FALSE
+);
+BEGIN {
+	try { OpenGL::Sandbox->import(qw( glShaderSource_p glGetShaderiv_p glGetShaderInfoLog_p )); }
+	catch {
+		try {
+			require OpenGL::Modern::Helpers;
+			OpenGL::Modern::Helpers->import(qw( glShaderSource_p glGetShaderiv_p glGetShaderInfoLog_p ));
+		}
+		catch {
+			croak "Can't load required gl functions for shaders: $_";
+		};
+	};
 }
-
-sub OpenGL::Sandbox::Shader::Trampoline::_build_id { choose_implementation('_build_id', @_) }
-sub OpenGL::Sandbox::Shader::Trampoline::_load     { choose_implementation('_load', @_) }
 
 # ABSTRACT: Wrapper object for OpenGL shader
 # VERSION
@@ -111,6 +115,40 @@ sub load {
 	my $loader= $self->loader // '_load';
 	$self->$loader($fname);
 	$self;
+}
+
+sub _build_id {
+	my $self= shift;
+	my $type= defined $self->type? $self->type
+		: $self->filename =~ /\.frag$/i? GL_FRAGMENT_SHADER
+		: $self->filename =~ /\.vert$/i? GL_VERTEX_SHADER
+		: croak "No shader type specified, and don't recognize file extension";
+	my $id= glCreateShader($type);
+	warn_gl_errors and croak "glCreateShader failed";
+	$self->type($type);
+	$id;
+}
+
+sub _load {
+	my ($self, $fname)= @_;
+	my $id= $self->id;
+	# TODO: check for binary pre-compiled shaders
+	my $source= $self->source // do { ${OpenGL::Sandbox::MMap->new($fname)} };
+	glShaderSource_p($id, $source);
+	warn_gl_errors and croak("glShaderSource failed (for $fname)");
+	glCompileShader($id);
+	warn_gl_errors and croak("glCompileShader failed (for $fname)");
+	if (glGetShaderiv_p($id, GL_COMPILE_STATUS) == GL_FALSE) {
+		my $log= glGetShaderInfoLog_p($id);
+		croak "Error in shader: $log";
+    }
+	$self->loaded(1);
+}
+
+sub DESTROY {
+	my $self= shift;
+	glDeleteShader($self->id) if $self->has_id;
+	delete $self->{id};
 }
 
 1;

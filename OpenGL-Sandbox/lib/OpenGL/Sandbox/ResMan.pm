@@ -366,8 +366,7 @@ GL shader type, unless you specifically passed it in C<%options> or configured i
 L</shader_config>.  Every call after the first uses the cached shader object, and C<%options>
 are ignored.
 
-Shader objects will always be returned, but using them will throw exceptions if the
-OpenGL context can't support them.
+Shader and Program objects require OpenGL version 2.0 or above.
 
 =cut
 
@@ -413,8 +412,7 @@ Then this will augment the configuration with
 
    shaders => { vert => 'foo.vert', frag => 'foo.frag' }
 
-Shader objects will always be returned, but using them will throw exceptions if the
-OpenGL context can't support them.
+Shader and Program objects require OpenGL version 2.0 or above.
 
 =cut
 

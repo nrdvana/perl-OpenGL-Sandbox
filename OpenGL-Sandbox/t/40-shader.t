@@ -7,15 +7,15 @@ use Test::More;
 use lib "$FindBin::Bin/lib";
 use Log::Any::Adapter 'TAP';
 use OpenGL::Sandbox qw/ make_context get_gl_errors GL_FLOAT /;
-use OpenGL::Sandbox::Shader;
-use OpenGL::Sandbox::Program;
 
 plan skip_all => "Can't create an OpenGL context: $@"
 	unless eval { make_context(); 1 };
 
 plan skip_all => "No support for modern shaders in this OpenGL context: $@"
-	unless eval { OpenGL::Sandbox::Shader::choose_implementation }
-		and eval { OpenGL::Sandbox::Program::choose_implementation };
+	unless eval {
+		require OpenGL::Sandbox::Shader;
+		require OpenGL::Sandbox::Program;
+	};
 
 OpenGL::Sandbox->import('GL_FLOAT_MAT4');
 
