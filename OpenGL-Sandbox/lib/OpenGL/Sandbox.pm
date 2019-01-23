@@ -2,6 +2,7 @@ package OpenGL::Sandbox;
 use v5.14; # I can aim for older upon request.  Not expecting any requests though.
 use Exporter::Extensible -exporter_setup => 1;
 use Try::Tiny;
+use Cwd 'abs_path';
 use Carp;
 use Log::Any '$log';
 use Module::Runtime 'require_module';
@@ -363,8 +364,8 @@ sub warn_gl_errors {
 
 # Pull in the C file and make sure it has all the C libs available
 use OpenGL::Sandbox::Inline
-	C => do { my $x= __FILE__; $x =~ s|\.pm|\.c|; Cwd::abs_path($x) },
-	INC => '-I'.do{ my $x= __FILE__; $x =~ s|/[^/]+$|/|; Cwd::abs_path($x) }.' -I/usr/include/ffmpeg',
+	C => do { my $x= __FILE__; $x =~ s|\.pm|\.c|; abs_path($x) },
+	INC => '-I'.do{ my $x= __FILE__; $x =~ s|/[^/]+$|/|; abs_path($x) }.' -I/usr/include/ffmpeg',
 	LIBS => '-lGL -lswscale',
 	CCFLAGSEX => '-Wall -g3 -Os';
 
