@@ -215,22 +215,29 @@ void _img_rgb_to_bgr(SV *sref, int has_alpha) {
 	}
 }
 
+/* Wrappers for various shader-related functions, requiring at least GL 2.0 */
 #ifdef GL_VERSION_2_0
 
 const char* get_glsl_type_name(int type) {
 	switch (type) {
-	case GL_FLOAT:             return "float";
-	case GL_FLOAT_VEC2:        return "vec2";
-	case GL_FLOAT_VEC3:        return "vec3";
-	case GL_FLOAT_VEC4:        return "vec4";
+	case GL_BOOL:              return "bool";
+	case GL_BOOL_VEC2:         return "bvec2";
+	case GL_BOOL_VEC3:         return "bvec3";
+	case GL_BOOL_VEC4:         return "bvec4";
 	case GL_INT:               return "int";
 	case GL_INT_VEC2:          return "ivec2";
 	case GL_INT_VEC3:          return "ivec3";
 	case GL_INT_VEC4:          return "ivec4";
 	case GL_UNSIGNED_INT:      return "unsigned int";
+	#ifdef GL_VERSION_2_1
 	case GL_UNSIGNED_INT_VEC2: return "uvec2";
 	case GL_UNSIGNED_INT_VEC3: return "uvec3";
 	case GL_UNSIGNED_INT_VEC4: return "uvec4";
+	#endif
+	case GL_FLOAT:             return "float";
+	case GL_FLOAT_VEC2:        return "vec2";
+	case GL_FLOAT_VEC3:        return "vec3";
+	case GL_FLOAT_VEC4:        return "vec4";
 	case GL_FLOAT_MAT2:        return "mat2";
 	case GL_FLOAT_MAT3:        return "mat3";
 	case GL_FLOAT_MAT4:        return "mat4";
@@ -240,6 +247,21 @@ const char* get_glsl_type_name(int type) {
 	case GL_FLOAT_MAT3x4:      return "mat3x4";
 	case GL_FLOAT_MAT4x2:      return "mat4x2";
 	case GL_FLOAT_MAT4x3:      return "mat4x3";
+	case GL_DOUBLE:            return "double";
+	#ifdef GL_VERSION_4_1
+	case GL_DOUBLE_VEC2:       return "dvec2";
+	case GL_DOUBLE_VEC3:       return "dvec3";
+	case GL_DOUBLE_VEC4:       return "dvec4";
+	case GL_DOUBLE_MAT2:       return "dmat2";
+	case GL_DOUBLE_MAT3:       return "dmat3";
+	case GL_DOUBLE_MAT4:       return "dmat4";
+	case GL_DOUBLE_MAT2x3:     return "dmat2x3";
+	case GL_DOUBLE_MAT3x2:     return "dmat3x2";
+	case GL_DOUBLE_MAT2x4:     return "dmat2x4";
+	case GL_DOUBLE_MAT4x2:     return "dmat4x2";
+	case GL_DOUBLE_MAT3x4:     return "dmat3x4";
+	case GL_DOUBLE_MAT4x3:     return "dmat4x3";
+	#endif
 	default: return NULL;
 	}
 }
@@ -273,9 +295,19 @@ SV * get_program_uniforms(unsigned program) {
 void set_uniform(unsigned program, SV* uniform_cache, const char *name, ...) {
 	Inline_Stack_Vars;
 	SV **entry, *s;
-	int type= 0, component_type, size= 0, loc= 0, components= 0, buf_req= 0, i;
+	int type= 0, component_type, size= 0, loc= 0, components= 0, buf_req= 0, i, cur_prog;
 	char static_buf[ 8 * 16 ], *buf;
 	AV *info= NULL, *array= NULL;
+	
+	/* Can't call glUniform for a program that isn't the active one, unless GL > 4.1 */
+	glGetIntegerv(GL_CURRENT_PROGRAM, &cur_prog);
+	if (cur_prog != program) {
+		#ifdef GL_VERSION_4_1
+		glGetIntegerv(GL_MAJOR_VERSION, &i);
+		if (i < 4)
+		#endif
+			croak("Can't set uniforms for program other than the current (unless GL >= 4.1)");
+	}
 
 	/* Lazy-build the uniform cache */
 	if (!SvROK(uniform_cache) || !SvOK(SvRV(uniform_cache)) || SvTYPE(SvRV(uniform_cache)) != SVt_PVHV) {
@@ -399,6 +431,9 @@ void set_uniform(unsigned program, SV* uniform_cache, const char *name, ...) {
 	}
 
 	/* Finally, call glUniform depending on the type */
+	#ifdef GL_VERSION_4_1
+	if (cur_prog == program) {
+	#endif
 	switch (type) {
 	case GL_INT:      case GL_BOOL:      glUniform1iv(loc, size, (GLint*) buf); break;
 	case GL_INT_VEC2: case GL_BOOL_VEC2: glUniform2iv(loc, size, (GLint*) buf); break;
@@ -442,7 +477,49 @@ void set_uniform(unsigned program, SV* uniform_cache, const char *name, ...) {
 	#endif
 	default: croak("Unimplemented type %d for uniform %s", type, name);
 	}
+	#ifdef GL_VERSION_4_1
+	} else {
+		switch (type) {
+		case GL_INT:      case GL_BOOL:      glProgramUniform1iv(loc, size, (GLint*) buf); break;
+		case GL_INT_VEC2: case GL_BOOL_VEC2: glProgramUniform2iv(loc, size, (GLint*) buf); break;
+		case GL_INT_VEC3: case GL_BOOL_VEC3: glProgramUniform3iv(loc, size, (GLint*) buf); break;
+		case GL_INT_VEC4: case GL_BOOL_VEC4: glProgramUniform4iv(loc, size, (GLint*) buf); break;
+		case GL_UNSIGNED_INT:      glProgramUniform1uiv(loc, size, (GLuint*) buf); break;
+		case GL_UNSIGNED_INT_VEC2: glProgramUniform2uiv(loc, size, (GLuint*) buf); break;
+		case GL_UNSIGNED_INT_VEC3: glProgramUniform3uiv(loc, size, (GLuint*) buf); break;
+		case GL_UNSIGNED_INT_VEC4: glProgramUniform4uiv(loc, size, (GLuint*) buf); break;
+		case GL_FLOAT:         glProgramUniform1fv(loc, size, (GLfloat*) buf); break;
+		case GL_FLOAT_VEC2:    glProgramUniform2fv(loc, size, (GLfloat*) buf); break;
+		case GL_FLOAT_VEC3:    glProgramUniform3fv(loc, size, (GLfloat*) buf); break;
+		case GL_FLOAT_VEC4:    glProgramUniform4fv(loc, size, (GLfloat*) buf); break;
+		case GL_FLOAT_MAT2:    glProgramUniformMatrix2fv(loc, size, 0, (GLfloat*) buf); break;
+		case GL_FLOAT_MAT3:    glProgramUniformMatrix3fv(loc, size, 0, (GLfloat*) buf); break;
+		case GL_FLOAT_MAT4:    glProgramUniformMatrix4fv(loc, size, 0, (GLfloat*) buf); break;
+		case GL_FLOAT_MAT2x3:  glProgramUniformMatrix2x3fv(loc, size, 0, (GLfloat*) buf); break;
+		case GL_FLOAT_MAT3x2:  glProgramUniformMatrix3x2fv(loc, size, 0, (GLfloat*) buf); break;
+		case GL_FLOAT_MAT2x4:  glProgramUniformMatrix2x4fv(loc, size, 0, (GLfloat*) buf); break;
+		case GL_FLOAT_MAT4x2:  glProgramUniformMatrix4x2fv(loc, size, 0, (GLfloat*) buf); break;
+		case GL_FLOAT_MAT3x4:  glProgramUniformMatrix3x4fv(loc, size, 0, (GLfloat*) buf); break;
+		case GL_FLOAT_MAT4x3:  glProgramUniformMatrix4x3fv(loc, size, 0, (GLfloat*) buf); break;
+		case GL_DOUBLE:        glProgramUniform1dv(loc, size, (GLdouble*) buf); break;
+		case GL_DOUBLE_VEC2:   glProgramUniform2dv(loc, size, (GLdouble*) buf); break;
+		case GL_DOUBLE_VEC3:   glProgramUniform3dv(loc, size, (GLdouble*) buf); break;
+		case GL_DOUBLE_VEC4:   glProgramUniform4dv(loc, size, (GLdouble*) buf); break;
+		case GL_DOUBLE_MAT2:   glProgramUniformMatrix2dv(loc, size, 0, (GLdouble*) buf); break;
+		case GL_DOUBLE_MAT3:   glProgramUniformMatrix3dv(loc, size, 0, (GLdouble*) buf); break;
+		case GL_DOUBLE_MAT4:   glProgramUniformMatrix4dv(loc, size, 0, (GLdouble*) buf); break;
+		case GL_DOUBLE_MAT2x3: glProgramUniformMatrix2x3dv(loc, size, 0, (GLdouble*) buf); break;
+		case GL_DOUBLE_MAT3x2: glProgramUniformMatrix3x2dv(loc, size, 0, (GLdouble*) buf); break;
+		case GL_DOUBLE_MAT2x4: glProgramUniformMatrix2x4dv(loc, size, 0, (GLdouble*) buf); break;
+		case GL_DOUBLE_MAT4x2: glProgramUniformMatrix4x2dv(loc, size, 0, (GLdouble*) buf); break;
+		case GL_DOUBLE_MAT3x4: glProgramUniformMatrix3x4dv(loc, size, 0, (GLdouble*) buf); break;
+		case GL_DOUBLE_MAT4x3: glProgramUniformMatrix4x3dv(loc, size, 0, (GLdouble*) buf); break;
+		default: croak("Unimplemented type %d for uniform %s", type, name);
+		}
+	}
+	#endif
 	Inline_Stack_Void;
 }
 
 #endif
+/* end version guard for shaders */
