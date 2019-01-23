@@ -18,6 +18,11 @@ my $res= OpenGL::Sandbox::ResMan->default_instance;
 OpenGL::Sandbox->import(-resources => { path => catdir($FindBin::Bin, 'data') });
 is( $res->path, catdir($FindBin::Bin, 'data'), 'path was changed' );
 
+# Call methods, just to check code path of triggers
+$res->tex_path('tex');
+$res->shader_path('shader');
+$res->font_path('font');
+
 $res->tex_config({
 	default => '8x8',
 });

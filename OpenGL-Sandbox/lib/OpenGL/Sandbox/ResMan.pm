@@ -2,7 +2,7 @@ package OpenGL::Sandbox::ResMan;
 use Moo;
 use Try::Tiny;
 use Carp;
-use File::Spec::Functions qw/ catdir rel2abs file_name_is_absolute canonpath /;
+use File::Spec::Functions qw/ catdir rel2abs file_name_is_absolute canonpath splitdir /;
 use Log::Any '$log';
 use OpenGL::Sandbox::MMap;
 use OpenGL::Sandbox::Texture;
@@ -42,6 +42,21 @@ The path where resources are located, adhering to the basic layout of:
   ./font/         # fonts compatible with libfreetype
   ./font/default  # file or symlink for default font.  Required.
   ./shader/       # GLSL shaders with extension '.glsl', '.frag', or '.vert'
+
+You can override these implied sub-paths with the following attributes:
+
+=over
+
+=item tex_path
+
+=item shader_path
+
+=item font_path
+
+=back
+
+A plain string is interpreted as relative to C</path>; an absolute path or path beginning
+with C<"."> is used as-is.
 
 =head2 font_config
 
@@ -103,11 +118,18 @@ Example program_config
 
 =cut
 
-has path              => ( is => 'rw', default => sub { '.' } );
+has path              => ( is => 'rw', default => sub {'.'}, trigger => sub {
+	$_[0]->_clear_texture_dir_cache;
+	$_[0]->_clear_shader_dir_cache;
+	$_[0]->_clear_font_dir_cache;
+});
 *resource_root_dir= *path; # back-compat name
-has font_config       => ( is => 'rw', default => sub { +{} } );
+has tex_path          => ( is => 'rw', default => sub {'tex'},    trigger => sub { shift->_clear_texture_dir_cache } );
+has shader_path       => ( is => 'rw', default => sub {'shader'}, trigger => sub { shift->_clear_shader_dir_cache } );
+has font_path         => ( is => 'rw', default => sub {'font'},   trigger => sub { shift->_clear_font_dir_cache } );
 has tex_config        => ( is => 'rw', default => sub { +{} } );
 has shader_config     => ( is => 'rw', default => sub { +{} } );
+has font_config       => ( is => 'rw', default => sub { +{} } );
 has program_config    => ( is => 'rw', default => sub { +{} } );
 has tex_fmt_priority  => ( is => 'rw', lazy => 1, builder => 1 );
 has tex_default_fmt   => ( is => 'rw', lazy => 1, builder => 1 );
@@ -129,23 +151,28 @@ sub _build_tex_default_fmt {
 	return $first // 'bgr';
 }
 
-has _fontdata_cache    => ( is => 'ro', default => sub { +{} } );
-has _font_cache        => ( is => 'ro', default => sub { +{} } );
-has _font_dir_cache    => ( is => 'lazy', clearer => 1 );
 has _texture_cache     => ( is => 'ro', default => sub { +{} } );
 has _texture_dir_cache => ( is => 'lazy', clearer => 1 );
 has _shader_dir_cache  => ( is => 'lazy', clearer => 1 );
 has _shader_cache      => ( is => 'ro', default => sub { +{} } );
 has _program_cache     => ( is => 'ro', default => sub { +{} } );
+has _fontdata_cache    => ( is => 'ro', default => sub { +{} } );
+has _font_cache        => ( is => 'ro', default => sub { +{} } );
+has _font_dir_cache    => ( is => 'lazy', clearer => 1 );
 
-sub _build__texture_dir_cache {
-	$_[0]->_cache_directory(catdir($_[0]->path, 'tex'), $_[0]->tex_fmt_priority)
+sub _interpret_path {
+	my ($self, $spec)= @_;
+	return $spec if file_name_is_absolute($spec) or (splitdir($spec))[0] eq '.';
+	return catdir($self->path, $spec);
 }
-sub _build__font_dir_cache {
-	$_[0]->_cache_directory(catdir($_[0]->path, 'font'));
+sub _build__texture_dir_cache {
+	$_[0]->_cache_directory($_[0]->_interpret_path($_[0]->tex_path), $_[0]->tex_fmt_priority)
 }
 sub _build__shader_dir_cache {
-	$_[0]->_cache_directory(catdir($_[0]->path, 'shader'));
+	$_[0]->_cache_directory($_[0]->_interpret_path($_[0]->shader_path));
+}
+sub _build__font_dir_cache {
+	$_[0]->_cache_directory($_[0]->_interpret_path($_[0]->font_path));
 }
 
 =head1 METHODS
