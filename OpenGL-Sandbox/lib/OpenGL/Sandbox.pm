@@ -133,7 +133,6 @@ export qw( =$res font tex shader program
 	make_context current_context next_frame
 	get_gl_errors log_gl_errors warn_gl_errors
 	gen_textures delete_texture round_up_pow2
-	glGetString glGetError GL_VERSION
 	),
 	-V1 => sub { Module::Runtime::use_module('OpenGL::Sandbox::V1','0.04'); },
 	# Conditionally export the stuff that gets conditionally compiled
@@ -147,17 +146,19 @@ sub _generateScalar_res { \OpenGL::Sandbox::ResMan->default_instance; }
 sub exporter_autoload_symbol {
 	my ($self, $sym)= @_;
 	if ($sym =~ /^(?:(GL_)|(gl[a-zA-Z]))/) {
-		# First import it into this package, for cached export
-		$OpenGLModule->import($sym);
-		no strict 'refs';
-		# If it is a constant, make sure it has been collapsed to a perl constant
-		# (the original OpenGL module fails to do this)
-		if ($1) {
-			my $val= __PACKAGE__->can($sym)->();
-			undef *$sym;
-			constant->import($sym => $val);
-		}
-		return ($OpenGL::Sandbox::EXPORT{$sym}= __PACKAGE__->can($sym));
+		return __PACKAGE__->can($sym) // do {
+			# First import it into this package, for cached export
+			$OpenGLModule->import($sym);
+			no strict 'refs';
+			# If it is a constant, make sure it has been collapsed to a perl constant
+			# (the original OpenGL module fails to do this)
+			if ($1) {
+				my $val= __PACKAGE__->can($sym)->();
+				undef *$sym;
+				constant->import($sym => $val);
+			}
+			__PACKAGE__->can($sym);
+		};
 	}
 	# Notation of -V1 means require "OpenGL::Sandbox::V1".
 	elsif ($sym =~ /^-V([0-9]+)/) {
