@@ -132,7 +132,8 @@ This *only* exports the symbols defined by this module collection, *not* every O
 export qw( =$res -resources(1) font tex shader program
 	make_context current_context next_frame
 	gl_error_name get_gl_errors log_gl_errors warn_gl_errors
-	gen_textures delete_texture round_up_pow2
+	gen_textures delete_texture gen_buffers delete_buffer round_up_pow2
+	load_buffer_data load_buffer_sub_data
 	),
 	-V1 => sub { Module::Runtime::use_module('OpenGL::Sandbox::V1','0.04'); },
 	# Conditionally export the stuff that gets conditionally compiled

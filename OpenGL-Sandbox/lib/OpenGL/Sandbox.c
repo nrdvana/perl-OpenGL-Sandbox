@@ -36,6 +36,16 @@ void delete_texture(unsigned tx_id) {
 	glDeleteTextures(1, &tx_id);
 }
 
+int gen_buffers(int count) {
+	GLuint buf_id;
+	glGenBuffers(count, &buf_id);
+	return buf_id;
+}
+
+void delete_buffer(unsigned buf_id) {
+	glDeleteBuffers(1, &buf_id);
+}
+
 /* This function operates on the idea that a power of two texture composed of
  * RGB or RGBA pixels must either be 4*4*4...*4 or 4*4*4...*3 bytes long.
  * So, it will either be a clean power of 4, or a power of 4 times 3.
@@ -239,6 +249,76 @@ const char * gl_error_name(int code) {
 
 /* Wrappers for various shader-related functions, requiring at least GL 2.0 */
 #ifdef GL_VERSION_2_0
+
+void _get_buffer_from_sv(SV *s, char **data, long *size) {
+	dSP;
+	if (!s || !SvOK(s)) croak("Data is undefined");
+	if (sv_isa(s, "OpenGL::Array")) {
+		/* OpenGL::Array has an internal struct and the only way to correctly
+		 * access its ->data field is by calling the perl method ->ptr */
+		ENTER;
+		SAVETMPS;
+		PUSHMARK(SP);
+		EXTEND(SP, 1);
+		PUSHs(sv_mortalcopy(s));
+		PUTBACK;
+		if (call_method("ptr", G_SCALAR) != 1)
+			croak("stack assertion failed");
+		SPAGAIN;
+		*data= (char*) POPi;
+		PUTBACK;
+		FREETMPS;
+		LEAVE;
+		
+		ENTER;
+		SAVETMPS;
+		PUSHMARK(SP);
+		EXTEND(SP, 1);
+		PUSHs(sv_mortalcopy(s));
+		PUTBACK;
+		if (call_method("length", G_SCALAR) != 1)
+			croak("stack assertion failed");
+		SPAGAIN;
+		*size= POPi;
+		PUTBACK;
+		FREETMPS;
+		LEAVE;
+	}
+	else if (sv_isa(s, "OpenGL::Sandbox::MMap") || (SvROK(s) && SvPOK(SvRV(s)))) {
+		*data= SCALAR_REF_DATA(s);
+		*size= SCALAR_REF_LEN(s);
+	}
+	else if (SvPOK(s)) {
+		*data= SvPV(s, (*size));
+	}
+	else
+		croak("Don't know how to get data buffer from %s", SvPV_nolen(s));
+}
+
+void load_buffer_data(int target, SV *size_sv, SV *data_sv, SV *usage_sv) {
+	int usage= usage_sv && SvOK(usage_sv)? SvIV(usage_sv) : GL_STATIC_DRAW;
+	long size, data_size= 0;
+	char *data= NULL;
+	_get_buffer_from_sv(data_sv, &data, &data_size);
+	size= (size_sv && SvOK(size_sv))? SvIV(size_sv) : data_size;
+	if (data_size < size) croak("Data not long enough (%d bytes, you requested %d)", data_size, size);
+	glBufferData(target, size, data, usage);
+}
+
+void load_buffer_sub_data(int target, long offset, SV *size_sv, SV *data_sv, SV *data_offset_sv) {
+	long size, data_size= 0, data_offset;
+	char *data= NULL;
+	_get_buffer_from_sv(data_sv, &data, &data_size);
+	if (data_offset_sv && SvOK(data_offset_sv)) {
+		data_offset= SvIV(data_offset_sv);
+		if (data_offset > data_size) croak("Invalid data offset (%d exceeds data length %d)", data_offset, data_size);
+		data += data_offset;
+		data_size -= data_offset;
+	}
+	size= (size_sv && SvOK(size_sv))? SvIV(size_sv) : data_size;
+	if (data_size < size) croak("Data not long enough (%d bytes, you requested %d)", data_size, size);
+	glBufferSubData(target, offset, size, data);
+}
 
 const char* get_glsl_type_name(int type) {
 	switch (type) {

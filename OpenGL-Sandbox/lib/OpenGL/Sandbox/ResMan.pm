@@ -128,6 +128,7 @@ has tex_path          => ( is => 'rw', default => sub {'tex'},    trigger => sub
 has shader_path       => ( is => 'rw', default => sub {'shader'}, trigger => sub { shift->_clear_shader_dir_cache } );
 has font_path         => ( is => 'rw', default => sub {'font'},   trigger => sub { shift->_clear_font_dir_cache } );
 has tex_config        => ( is => 'rw', default => sub { +{} } );
+has buffer_config     => ( is => 'rw', default => sub { +{} } );
 has shader_config     => ( is => 'rw', default => sub { +{} } );
 has font_config       => ( is => 'rw', default => sub { +{} } );
 has program_config    => ( is => 'rw', default => sub { +{} } );
@@ -151,8 +152,9 @@ sub _build_tex_default_fmt {
 	return $first // 'bgr';
 }
 
-has _texture_cache     => ( is => 'ro', default => sub { +{} } );
 has _texture_dir_cache => ( is => 'lazy', clearer => 1 );
+has _texture_cache     => ( is => 'ro', default => sub { +{} } );
+has _buffer_cache      => ( is => 'ro', default => sub { +{} } );
 has _shader_dir_cache  => ( is => 'lazy', clearer => 1 );
 has _shader_cache      => ( is => 'ro', default => sub { +{} } );
 has _program_cache     => ( is => 'ro', default => sub { +{} } );
@@ -354,6 +356,51 @@ sub load_texture {
 	$tex= OpenGL::Sandbox::Texture->new(%options, filename => $info->[1]);
 	$self->_texture_cache->{$name}= $tex;
 	return $tex;
+}
+
+=head2 buffer
+
+  my $buffer= $res->buffer( $name );
+
+Return an existing or configured buffer object.  If the name is unknown, this dies.
+Use L</new_buffer> to create a new named buffer object.
+
+Buffer objects require OpenGL version 2.0 or above.
+
+=head2 new_buffer
+
+  my $buffer= $res->new_buffer( $name, %options );
+
+This creates a new buffer object using the given key/value pairs of C<%options>.  If there was
+a configuration for this named buffer, the options will be merged into it.  This dies if
+L<$name> already exists.
+
+Buffer objects require OpenGL version 2.0 or above.
+
+=cut
+
+sub buffer {
+	my ($self, $name)= @_;
+	$self->_buffer_cache->{$name} || do {
+		defined $self->buffer_config->{$name} or croak "No such buffer '$name'";
+		$self->_new_buffer($name);
+	};
+}
+
+sub new_buffer {
+	# Loading Shader might die on old OpenGL, so use a trampoline before accessing for first time.
+	require OpenGL::Sandbox::Buffer;
+	no warnings 'redefine';
+	*new_buffer= *_new_buffer;
+	shift->_new_buffer(@_);
+}
+sub _new_buffer {
+	my ($self, $name, %options)= @_;
+	$self->_buffer_cache->{$name} and croak "Buffer '$name' already exists";
+	$self->_buffer_cache->{$name}= OpenGL::Sandbox::Buffer->new(
+		%{ $self->buffer_config->{$name} // {} },
+		%options
+	);
 }
 
 =head2 shader

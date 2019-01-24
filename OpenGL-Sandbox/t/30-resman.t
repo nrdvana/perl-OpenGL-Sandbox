@@ -48,9 +48,20 @@ is( $res->tex('8x8'), $res->tex('default'), '8x8 is default' );
 $res->tex('8x8')->load;
 is( $res->tex('8x8')->width, 8, 'width=8' );
 
-isa_ok( $res->shader('zero.frag'), 'OpenGL::Sandbox::Shader', 'load a shader' );
-isa_ok( $res->program('zero'), 'OpenGL::Sandbox::Program', 'load a shader program' );
-like( $res->program('zero')->shaders->{vert}->filename, qr/zero.vert$/, 'found vert shader of prog "zero"' );
-like( $res->program('zero')->shaders->{frag}->filename, qr/zero.frag$/, 'found frag shader of prog "zero"' );
+SKIP: {
+	skip "Need shader support", 4 unless eval { require OpenGL::Sandbox::Shader; 1 };
+	isa_ok( $res->shader('zero.frag'), 'OpenGL::Sandbox::Shader', 'load a shader' );
+	isa_ok( $res->program('zero'), 'OpenGL::Sandbox::Program', 'load a shader program' );
+	like( $res->program('zero')->shaders->{vert}->filename, qr/zero.vert$/, 'found vert shader of prog "zero"' );
+	like( $res->program('zero')->shaders->{frag}->filename, qr/zero.frag$/, 'found frag shader of prog "zero"' );
+}
+
+SKIP: {
+	skip "Need buffer support", 3 unless eval { require OpenGL::Sandbox::Buffer; 1 };
+	isa_ok( $res->new_buffer('foo'), 'OpenGL::Sandbox::Buffer', 'create a buffer' );
+	is( eval { $res->buffer('bar') }, undef, 'can\'t access non-existent buffer' );
+	$res->buffer_config->{bar}= { };
+	ok( eval { $res->buffer('bar') }, 'can auto-create object as long as it is configured' );
+}
 
 done_testing;
