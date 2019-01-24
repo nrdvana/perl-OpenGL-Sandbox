@@ -10,6 +10,88 @@
 #define AV_PIX_FMT_BGR24 PIX_FMT_BGR24
 #endif
 
+/* Don't want to get into the whole GLEW stuff, but these don't seem to be in gl.h...
+ * Shouldn't hurt to include them as long as all access is guarded by #ifdef GL_VERSION_
+ */
+extern void glGenerateMipmap(int);
+extern void glGenBuffers( GLsizei n, GLuint * buffers);
+extern void glDeleteBuffers( GLsizei n, const GLuint * buffers);
+extern void glBufferData( GLenum target, GLsizeiptr size, const GLvoid * data, GLenum usage);
+extern void glBufferSubData( GLenum target, GLintptr offset, GLsizeiptr size, const GLvoid * data);
+extern void glGetProgramiv( GLuint program, GLenum pname, GLint *params);
+extern GLint glGetUniformLocation( GLuint program, const GLchar *name);
+extern void glGetActiveUniform( GLuint program, GLuint index, GLsizei bufSize, GLsizei *length, GLint *size, GLenum *type, GLchar *name);
+extern void glUniform1fv( GLint location, GLsizei count, const GLfloat *value);
+extern void glUniform2fv( GLint location, GLsizei count, const GLfloat *value);
+extern void glUniform3fv( GLint location, GLsizei count, const GLfloat *value);
+extern void glUniform4fv( GLint location, GLsizei count, const GLfloat *value);
+extern void glUniform1iv( GLint location, GLsizei count, const GLint *value);
+extern void glUniform2iv( GLint location, GLsizei count, const GLint *value);
+extern void glUniform3iv( GLint location, GLsizei count, const GLint *value);
+extern void glUniform4iv( GLint location, GLsizei count, const GLint *value);
+extern void glUniform1uiv( GLint location, GLsizei count, const GLuint *value);
+extern void glUniform2uiv( GLint location, GLsizei count, const GLuint *value);
+extern void glUniform3uiv( GLint location, GLsizei count, const GLuint *value);
+extern void glUniform4uiv( GLint location, GLsizei count, const GLuint *value);
+extern void glUniformMatrix2fv( GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
+extern void glUniformMatrix3fv( GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
+extern void glUniformMatrix4fv( GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
+extern void glUniformMatrix2x3fv( GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
+extern void glUniformMatrix3x2fv( GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
+extern void glUniformMatrix2x4fv( GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
+extern void glUniformMatrix4x2fv( GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
+extern void glUniformMatrix3x4fv( GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
+extern void glUniformMatrix4x3fv( GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
+#ifdef GL_VERSION_4_1
+extern void glUniform1dv( GLint location, GLsizei count, const GLdouble *value);
+extern void glUniform2dv( GLint location, GLsizei count, const GLdouble *value);
+extern void glUniform3dv( GLint location, GLsizei count, const GLdouble *value);
+extern void glUniform4dv( GLint location, GLsizei count, const GLdouble *value);
+extern void glUniformMatrix2dv( GLint location, GLsizei count, GLboolean transpose, const GLdouble *value);
+extern void glUniformMatrix3dv( GLint location, GLsizei count, GLboolean transpose, const GLdouble *value);
+extern void glUniformMatrix4dv( GLint location, GLsizei count, GLboolean transpose, const GLdouble *value);
+extern void glUniformMatrix2x3dv( GLint location, GLsizei count, GLboolean transpose, const GLdouble *value);
+extern void glUniformMatrix3x2dv( GLint location, GLsizei count, GLboolean transpose, const GLdouble *value);
+extern void glUniformMatrix2x4dv( GLint location, GLsizei count, GLboolean transpose, const GLdouble *value);
+extern void glUniformMatrix4x2dv( GLint location, GLsizei count, GLboolean transpose, const GLdouble *value);
+extern void glUniformMatrix3x4dv( GLint location, GLsizei count, GLboolean transpose, const GLdouble *value);
+extern void glUniformMatrix4x3dv( GLint location, GLsizei count, GLboolean transpose, const GLdouble *value);
+extern void glProgramUniform1fv( GLuint program, GLint location, GLsizei count, const GLfloat *value);
+extern void glProgramUniform2fv( GLuint program, GLint location, GLsizei count, const GLfloat *value);
+extern void glProgramUniform3fv( GLuint program, GLint location, GLsizei count, const GLfloat *value);
+extern void glProgramUniform4fv( GLuint program, GLint location, GLsizei count, const GLfloat *value);
+extern void glProgramUniform1iv( GLuint program, GLint location, GLsizei count, const GLint *value);
+extern void glProgramUniform2iv( GLuint program, GLint location, GLsizei count, const GLint *value);
+extern void glProgramUniform3iv( GLuint program, GLint location, GLsizei count, const GLint *value);
+extern void glProgramUniform4iv( GLuint program, GLint location, GLsizei count, const GLint *value);
+extern void glProgramUniform1uiv( GLuint program, GLint location, GLsizei count, const GLuint *value);
+extern void glProgramUniform2uiv( GLuint program, GLint location, GLsizei count, const GLuint *value);
+extern void glProgramUniform3uiv( GLuint program, GLint location, GLsizei count, const GLuint *value);
+extern void glProgramUniform4uiv( GLuint program, GLint location, GLsizei count, const GLuint *value);
+extern void glProgramUniformMatrix2fv( GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
+extern void glProgramUniformMatrix3fv( GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
+extern void glProgramUniformMatrix4fv( GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
+extern void glProgramUniformMatrix2x3fv( GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
+extern void glProgramUniformMatrix3x2fv( GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
+extern void glProgramUniformMatrix2x4fv( GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
+extern void glProgramUniformMatrix4x2fv( GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
+extern void glProgramUniformMatrix3x4fv( GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
+extern void glProgramUniformMatrix4x3fv( GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
+extern void glProgramUniform1dv( GLuint program, GLint location, GLsizei count, const GLdouble *value);
+extern void glProgramUniform2dv( GLuint program, GLint location, GLsizei count, const GLdouble *value);
+extern void glProgramUniform3dv( GLuint program, GLint location, GLsizei count, const GLdouble *value);
+extern void glProgramUniform4dv( GLuint program, GLint location, GLsizei count, const GLdouble *value);
+extern void glProgramUniformMatrix2dv( GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLdouble *value);
+extern void glProgramUniformMatrix3dv( GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLdouble *value);
+extern void glProgramUniformMatrix4dv( GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLdouble *value);
+extern void glProgramUniformMatrix2x3dv( GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLdouble *value);
+extern void glProgramUniformMatrix3x2dv( GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLdouble *value);
+extern void glProgramUniformMatrix2x4dv( GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLdouble *value);
+extern void glProgramUniformMatrix4x2dv( GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLdouble *value);
+extern void glProgramUniformMatrix3x4dv( GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLdouble *value);
+extern void glProgramUniformMatrix4x3dv( GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLdouble *value);
+#endif
+
 /* These macros are used to access the OpenGL::Sandbox::MMap object data */
 #define SCALAR_REF_DATA(obj) (SvROK(obj) && SvPOK(SvRV(obj))? (void*)SvPVX(SvRV(obj)) : (void*)0)
 #define SCALAR_REF_LEN(obj)  (SvROK(obj) && SvPOK(SvRV(obj))? SvCUR(SvRV(obj)) : 0)
@@ -22,29 +104,169 @@ SV *_fetch_if_defined(HV *self, const char *field, int len) {
 	return (field_p && *field_p && SvOK(*field_p)) ? *field_p : NULL;
 }
 
+void _get_buffer_from_sv(SV *s, char **data, unsigned long *size) {
+	dSP;
+	if (!s || !SvOK(s)) croak("Data is undefined");
+	if (sv_isa(s, "OpenGL::Array")) {
+		/* OpenGL::Array has an internal struct and the only way to correctly
+		 * access its ->data field is by calling the perl method ->ptr */
+		ENTER;
+		SAVETMPS;
+		PUSHMARK(SP);
+		EXTEND(SP, 1);
+		PUSHs(sv_mortalcopy(s));
+		PUTBACK;
+		if (call_method("ptr", G_SCALAR) != 1)
+			croak("stack assertion failed");
+		SPAGAIN;
+		*data= (char*) POPi;
+		PUTBACK;
+		FREETMPS;
+		LEAVE;
+		
+		ENTER;
+		SAVETMPS;
+		PUSHMARK(SP);
+		EXTEND(SP, 1);
+		PUSHs(sv_mortalcopy(s));
+		PUTBACK;
+		if (call_method("length", G_SCALAR) != 1)
+			croak("stack assertion failed");
+		SPAGAIN;
+		*size= POPi;
+		PUTBACK;
+		FREETMPS;
+		LEAVE;
+	}
+	else if (sv_isa(s, "OpenGL::Sandbox::MMap") || (SvROK(s) && SvPOK(SvRV(s)))) {
+		*data= SCALAR_REF_DATA(s);
+		*size= SCALAR_REF_LEN(s);
+	}
+	else if (SvPOK(s)) {
+		*data= SvPV(s, (*size));
+	}
+	else
+		croak("Don't know how to get data buffer from %s", SvPV_nolen(s));
+}
+
+void _recursive_pack(void *dest, int *dest_i, int dest_lim, int component_type, SV *val) {
+	int i, lim;
+	SV **elem;
+	AV *array;
+	if (SvROK(val) && SvTYPE(SvRV(val)) == SVt_PVAV) {
+		array= (AV*) SvRV(val);
+		for (i= 0, lim=av_len(array)+1; i < lim; i++) {
+			elem= av_fetch(array, i, 0);
+			if (!elem || !*elem)
+				croak("Undefined value in array");
+			_recursive_pack(dest, dest_i, dest_lim, component_type, *elem);
+		}
+	}
+	else {
+		if (*dest_i < dest_lim) {
+			switch (component_type) {
+			case GL_INT:          ((GLint*)dest)[*dest_i]= SvIV(val); break;
+			case GL_UNSIGNED_INT: ((GLuint*)dest)[*dest_i]= SvUV(val); break;
+			case GL_FLOAT:        ((GLfloat*)dest)[*dest_i]= SvNV(val); break;
+			#ifdef GL_VERSION_4_1
+			case GL_DOUBLE:       ((GLdouble*)dest)[*dest_i]= SvNV(val); break;
+			#endif
+			default: croak("Unimplemented");
+			}
+		}
+		/* increment regardless, so we can count how many extra arguments there were */
+		++(*dest_i);
+	}
+}
+
 /* These are wrappers around various OpenGL functions that don't have a nice and/or consistent
  * wrapper between OpenGL and OpenGL::Modern
  */
 
-int gen_textures(int count) {
-	GLuint tx_id;
-	glGenTextures(count, &tx_id);
-	return tx_id;
+void gen_textures(int count) {
+	Inline_Stack_Vars;
+	GLuint static_buf[16], *buf, i;
+
+	if (count < sizeof(static_buf)/sizeof(GLuint))
+		buf= static_buf;
+	else {
+		Newx(buf, count, GLuint);
+		SAVEFREEPV(buf); /* perl frees it for us */
+	}
+	glGenTextures(count, buf);
+	EXTEND(SP, count);
+	Inline_Stack_Reset;
+	for (i= 0; i < count; i++)
+		Inline_Stack_Push(newSViv(buf[i]));
+	Inline_Stack_Done;
+	Inline_Stack_Return(count);
 }
 
-void delete_texture(unsigned tx_id) {
-	glDeleteTextures(1, &tx_id);
+void delete_textures(SV *first, ...) {
+	Inline_Stack_Vars;
+	GLuint static_buf[16], *buf;
+	int dest_i, i, n= sizeof(static_buf)/sizeof(GLuint);
+	buf= static_buf;
+	
+	/* first pass, try static buffer */
+	for (i= 0, dest_i= 0; i < Inline_Stack_Items; i++)
+		_recursive_pack(buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
+	n= dest_i;
+	/* If too many, second pass with dynamic buffer */
+	if (n > sizeof(static_buf)/sizeof(GLuint)) {
+		Newx(buf, n, GLuint);
+		SAVEFREEPV(buf); /* perl frees it for us */
+		for (i= 0, dest_i= 0; i < Inline_Stack_Items; i++)
+			_recursive_pack(buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
+	}
+
+	glDeleteTextures(n, buf);
+	Inline_Stack_Void;
 }
 
-int gen_buffers(int count) {
-	GLuint buf_id;
-	glGenBuffers(count, &buf_id);
-	return buf_id;
+#ifdef GL_VERSION_2_0
+
+void gen_buffers(int count) {
+	Inline_Stack_Vars;
+	GLuint static_buf[16], *buf, i;
+
+	if (count < sizeof(static_buf)/sizeof(GLuint))
+		buf= static_buf;
+	else {
+		Newx(buf, count, GLuint);
+		SAVEFREEPV(buf); /* perl frees it for us */
+	}
+	glGenBuffers(count, buf);
+	EXTEND(SP, count);
+	Inline_Stack_Reset;
+	for (i= 0; i < count; i++)
+		Inline_Stack_Push(newSViv(buf[i]));
+	Inline_Stack_Done;
+	Inline_Stack_Return(count);
 }
 
-void delete_buffer(unsigned buf_id) {
-	glDeleteBuffers(1, &buf_id);
+void delete_buffers(unsigned buf_id) {
+	Inline_Stack_Vars;
+	GLuint static_buf[16], *buf;
+	int dest_i, i, n= sizeof(static_buf)/sizeof(GLuint);
+	buf= static_buf;
+	/* first pass, try static buffer */
+	for (i= 0, dest_i= 0; i < Inline_Stack_Items; i++)
+		_recursive_pack(buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
+	n= dest_i;
+	/* If too many, second pass with dynamic buffer */
+	if (n > sizeof(static_buf)/sizeof(GLuint)) {
+		Newx(buf, n, GLuint);
+		SAVEFREEPV(buf); /* perl frees it for us */
+		for (i= 0, dest_i= 0; i < Inline_Stack_Items; i++)
+			_recursive_pack(buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
+	}
+
+	glDeleteBuffers(n, buf);
+	Inline_Stack_Void;
 }
+
+#endif
 
 /* This function operates on the idea that a power of two texture composed of
  * RGB or RGBA pixels must either be 4*4*4...*4 or 4*4*4...*3 bytes long.
@@ -70,8 +292,6 @@ int _dimension_from_filesize(int filesize, int *has_alpha_out) {
 		return dim;
 	}
 }
-
-extern void glGenerateMipmap(int);
 
 void _texture_load_rgb_square(HV *self, SV *mmap, int is_bgr) {
 	SV *sv;
@@ -250,72 +470,27 @@ const char * gl_error_name(int code) {
 /* Wrappers for various shader-related functions, requiring at least GL 2.0 */
 #ifdef GL_VERSION_2_0
 
-void _get_buffer_from_sv(SV *s, char **data, long *size) {
-	dSP;
-	if (!s || !SvOK(s)) croak("Data is undefined");
-	if (sv_isa(s, "OpenGL::Array")) {
-		/* OpenGL::Array has an internal struct and the only way to correctly
-		 * access its ->data field is by calling the perl method ->ptr */
-		ENTER;
-		SAVETMPS;
-		PUSHMARK(SP);
-		EXTEND(SP, 1);
-		PUSHs(sv_mortalcopy(s));
-		PUTBACK;
-		if (call_method("ptr", G_SCALAR) != 1)
-			croak("stack assertion failed");
-		SPAGAIN;
-		*data= (char*) POPi;
-		PUTBACK;
-		FREETMPS;
-		LEAVE;
-		
-		ENTER;
-		SAVETMPS;
-		PUSHMARK(SP);
-		EXTEND(SP, 1);
-		PUSHs(sv_mortalcopy(s));
-		PUTBACK;
-		if (call_method("length", G_SCALAR) != 1)
-			croak("stack assertion failed");
-		SPAGAIN;
-		*size= POPi;
-		PUTBACK;
-		FREETMPS;
-		LEAVE;
-	}
-	else if (sv_isa(s, "OpenGL::Sandbox::MMap") || (SvROK(s) && SvPOK(SvRV(s)))) {
-		*data= SCALAR_REF_DATA(s);
-		*size= SCALAR_REF_LEN(s);
-	}
-	else if (SvPOK(s)) {
-		*data= SvPV(s, (*size));
-	}
-	else
-		croak("Don't know how to get data buffer from %s", SvPV_nolen(s));
-}
-
 void load_buffer_data(int target, SV *size_sv, SV *data_sv, SV *usage_sv) {
 	int usage= usage_sv && SvOK(usage_sv)? SvIV(usage_sv) : GL_STATIC_DRAW;
-	long size, data_size= 0;
+	unsigned long size, data_size= 0;
 	char *data= NULL;
 	_get_buffer_from_sv(data_sv, &data, &data_size);
-	size= (size_sv && SvOK(size_sv))? SvIV(size_sv) : data_size;
+	size= (size_sv && SvOK(size_sv))? SvUV(size_sv) : data_size;
 	if (data_size < size) croak("Data not long enough (%d bytes, you requested %d)", data_size, size);
 	glBufferData(target, size, data, usage);
 }
 
 void load_buffer_sub_data(int target, long offset, SV *size_sv, SV *data_sv, SV *data_offset_sv) {
-	long size, data_size= 0, data_offset;
+	unsigned long size, data_size= 0, data_offset;
 	char *data= NULL;
 	_get_buffer_from_sv(data_sv, &data, &data_size);
 	if (data_offset_sv && SvOK(data_offset_sv)) {
-		data_offset= SvIV(data_offset_sv);
+		data_offset= SvUV(data_offset_sv);
 		if (data_offset > data_size) croak("Invalid data offset (%d exceeds data length %d)", data_offset, data_size);
 		data += data_offset;
 		data_size -= data_offset;
 	}
-	size= (size_sv && SvOK(size_sv))? SvIV(size_sv) : data_size;
+	size= (size_sv && SvOK(size_sv))? SvUV(size_sv) : data_size;
 	if (data_size < size) croak("Data not long enough (%d bytes, you requested %d)", data_size, size);
 	glBufferSubData(target, offset, size, data);
 }
@@ -394,43 +569,13 @@ SV * get_program_uniforms(unsigned program) {
 	return newRV_inc((SV*) result);
 }
 
-void _recursive_pack(char *dest, int *dest_i, int dest_lim, int component_type, SV *val) {
-	int i, lim;
-	SV **elem;
-	AV *array;
-	if (SvROK(val) && SvTYPE(SvRV(val)) == SVt_PVAV) {
-		array= (AV*) SvRV(val);
-		for (i= 0, lim=av_len(array)+1; i < lim; i++) {
-			elem= av_fetch(array, i, 0);
-			if (!elem || !*elem)
-				croak("Undefined value in array");
-			_recursive_pack(dest, dest_i, dest_lim, component_type, *elem);
-		}
-	}
-	else {
-		if (*dest_i < dest_lim) {
-			switch (component_type) {
-			case GL_INT:          ((GLint*)dest)[*dest_i]= SvIV(val); break;
-			case GL_UNSIGNED_INT: ((GLuint*)dest)[*dest_i]= SvUV(val); break;
-			case GL_FLOAT:        ((GLfloat*)dest)[*dest_i]= SvNV(val); break;
-			#ifdef GL_VERSION_4_1
-			case GL_DOUBLE:       ((GLdouble*)dest)[*dest_i]= SvNV(val); break;
-			#endif
-			default: croak("Unimplemented");
-			}
-		}
-		/* increment regardless, so we can count how many extra arguments there were */
-		++(*dest_i);
-	}
-}
-
 void set_uniform(unsigned program, SV* uniform_cache, const char *name, ...) {
 	Inline_Stack_Vars;
 	SV **entry, *s;
 	int type= 0, component_type, size= 0, loc= 0, components= 0, buf_req= 0, i, cur_prog, arg_i, arg_lim, dest_i;
-	long buf_size;
+	unsigned long buf_size;
 	char static_buf[ 8 * 16 ], *buf= NULL;
-	AV *info= NULL, *array= NULL;
+	AV *info= NULL;
 	
 	/* Can't call glUniform for a program that isn't the active one, unless GL > 4.1 */
 	glGetIntegerv(GL_CURRENT_PROGRAM, &cur_prog);
@@ -595,40 +740,40 @@ void set_uniform(unsigned program, SV* uniform_cache, const char *name, ...) {
 	#ifdef GL_VERSION_4_1
 	} else {
 		switch (type) {
-		case GL_INT:      case GL_BOOL:      glProgramUniform1iv(loc, size, (GLint*) buf); break;
-		case GL_INT_VEC2: case GL_BOOL_VEC2: glProgramUniform2iv(loc, size, (GLint*) buf); break;
-		case GL_INT_VEC3: case GL_BOOL_VEC3: glProgramUniform3iv(loc, size, (GLint*) buf); break;
-		case GL_INT_VEC4: case GL_BOOL_VEC4: glProgramUniform4iv(loc, size, (GLint*) buf); break;
-		case GL_UNSIGNED_INT:      glProgramUniform1uiv(loc, size, (GLuint*) buf); break;
-		case GL_UNSIGNED_INT_VEC2: glProgramUniform2uiv(loc, size, (GLuint*) buf); break;
-		case GL_UNSIGNED_INT_VEC3: glProgramUniform3uiv(loc, size, (GLuint*) buf); break;
-		case GL_UNSIGNED_INT_VEC4: glProgramUniform4uiv(loc, size, (GLuint*) buf); break;
-		case GL_FLOAT:         glProgramUniform1fv(loc, size, (GLfloat*) buf); break;
-		case GL_FLOAT_VEC2:    glProgramUniform2fv(loc, size, (GLfloat*) buf); break;
-		case GL_FLOAT_VEC3:    glProgramUniform3fv(loc, size, (GLfloat*) buf); break;
-		case GL_FLOAT_VEC4:    glProgramUniform4fv(loc, size, (GLfloat*) buf); break;
-		case GL_FLOAT_MAT2:    glProgramUniformMatrix2fv(loc, size, 0, (GLfloat*) buf); break;
-		case GL_FLOAT_MAT3:    glProgramUniformMatrix3fv(loc, size, 0, (GLfloat*) buf); break;
-		case GL_FLOAT_MAT4:    glProgramUniformMatrix4fv(loc, size, 0, (GLfloat*) buf); break;
-		case GL_FLOAT_MAT2x3:  glProgramUniformMatrix2x3fv(loc, size, 0, (GLfloat*) buf); break;
-		case GL_FLOAT_MAT3x2:  glProgramUniformMatrix3x2fv(loc, size, 0, (GLfloat*) buf); break;
-		case GL_FLOAT_MAT2x4:  glProgramUniformMatrix2x4fv(loc, size, 0, (GLfloat*) buf); break;
-		case GL_FLOAT_MAT4x2:  glProgramUniformMatrix4x2fv(loc, size, 0, (GLfloat*) buf); break;
-		case GL_FLOAT_MAT3x4:  glProgramUniformMatrix3x4fv(loc, size, 0, (GLfloat*) buf); break;
-		case GL_FLOAT_MAT4x3:  glProgramUniformMatrix4x3fv(loc, size, 0, (GLfloat*) buf); break;
-		case GL_DOUBLE:        glProgramUniform1dv(loc, size, (GLdouble*) buf); break;
-		case GL_DOUBLE_VEC2:   glProgramUniform2dv(loc, size, (GLdouble*) buf); break;
-		case GL_DOUBLE_VEC3:   glProgramUniform3dv(loc, size, (GLdouble*) buf); break;
-		case GL_DOUBLE_VEC4:   glProgramUniform4dv(loc, size, (GLdouble*) buf); break;
-		case GL_DOUBLE_MAT2:   glProgramUniformMatrix2dv(loc, size, 0, (GLdouble*) buf); break;
-		case GL_DOUBLE_MAT3:   glProgramUniformMatrix3dv(loc, size, 0, (GLdouble*) buf); break;
-		case GL_DOUBLE_MAT4:   glProgramUniformMatrix4dv(loc, size, 0, (GLdouble*) buf); break;
-		case GL_DOUBLE_MAT2x3: glProgramUniformMatrix2x3dv(loc, size, 0, (GLdouble*) buf); break;
-		case GL_DOUBLE_MAT3x2: glProgramUniformMatrix3x2dv(loc, size, 0, (GLdouble*) buf); break;
-		case GL_DOUBLE_MAT2x4: glProgramUniformMatrix2x4dv(loc, size, 0, (GLdouble*) buf); break;
-		case GL_DOUBLE_MAT4x2: glProgramUniformMatrix4x2dv(loc, size, 0, (GLdouble*) buf); break;
-		case GL_DOUBLE_MAT3x4: glProgramUniformMatrix3x4dv(loc, size, 0, (GLdouble*) buf); break;
-		case GL_DOUBLE_MAT4x3: glProgramUniformMatrix4x3dv(loc, size, 0, (GLdouble*) buf); break;
+		case GL_INT:      case GL_BOOL:      glProgramUniform1iv(program, loc, size, (GLint*) buf); break;
+		case GL_INT_VEC2: case GL_BOOL_VEC2: glProgramUniform2iv(program, loc, size, (GLint*) buf); break;
+		case GL_INT_VEC3: case GL_BOOL_VEC3: glProgramUniform3iv(program, loc, size, (GLint*) buf); break;
+		case GL_INT_VEC4: case GL_BOOL_VEC4: glProgramUniform4iv(program, loc, size, (GLint*) buf); break;
+		case GL_UNSIGNED_INT:      glProgramUniform1uiv(program, loc, size, (GLuint*) buf); break;
+		case GL_UNSIGNED_INT_VEC2: glProgramUniform2uiv(program, loc, size, (GLuint*) buf); break;
+		case GL_UNSIGNED_INT_VEC3: glProgramUniform3uiv(program, loc, size, (GLuint*) buf); break;
+		case GL_UNSIGNED_INT_VEC4: glProgramUniform4uiv(program, loc, size, (GLuint*) buf); break;
+		case GL_FLOAT:         glProgramUniform1fv(program, loc, size, (GLfloat*) buf); break;
+		case GL_FLOAT_VEC2:    glProgramUniform2fv(program, loc, size, (GLfloat*) buf); break;
+		case GL_FLOAT_VEC3:    glProgramUniform3fv(program, loc, size, (GLfloat*) buf); break;
+		case GL_FLOAT_VEC4:    glProgramUniform4fv(program, loc, size, (GLfloat*) buf); break;
+		case GL_FLOAT_MAT2:    glProgramUniformMatrix2fv(program, loc, size, 0, (GLfloat*) buf); break;
+		case GL_FLOAT_MAT3:    glProgramUniformMatrix3fv(program, loc, size, 0, (GLfloat*) buf); break;
+		case GL_FLOAT_MAT4:    glProgramUniformMatrix4fv(program, loc, size, 0, (GLfloat*) buf); break;
+		case GL_FLOAT_MAT2x3:  glProgramUniformMatrix2x3fv(program, loc, size, 0, (GLfloat*) buf); break;
+		case GL_FLOAT_MAT3x2:  glProgramUniformMatrix3x2fv(program, loc, size, 0, (GLfloat*) buf); break;
+		case GL_FLOAT_MAT2x4:  glProgramUniformMatrix2x4fv(program, loc, size, 0, (GLfloat*) buf); break;
+		case GL_FLOAT_MAT4x2:  glProgramUniformMatrix4x2fv(program, loc, size, 0, (GLfloat*) buf); break;
+		case GL_FLOAT_MAT3x4:  glProgramUniformMatrix3x4fv(program, loc, size, 0, (GLfloat*) buf); break;
+		case GL_FLOAT_MAT4x3:  glProgramUniformMatrix4x3fv(program, loc, size, 0, (GLfloat*) buf); break;
+		case GL_DOUBLE:        glProgramUniform1dv(program, loc, size, (GLdouble*) buf); break;
+		case GL_DOUBLE_VEC2:   glProgramUniform2dv(program, loc, size, (GLdouble*) buf); break;
+		case GL_DOUBLE_VEC3:   glProgramUniform3dv(program, loc, size, (GLdouble*) buf); break;
+		case GL_DOUBLE_VEC4:   glProgramUniform4dv(program, loc, size, (GLdouble*) buf); break;
+		case GL_DOUBLE_MAT2:   glProgramUniformMatrix2dv(program, loc, size, 0, (GLdouble*) buf); break;
+		case GL_DOUBLE_MAT3:   glProgramUniformMatrix3dv(program, loc, size, 0, (GLdouble*) buf); break;
+		case GL_DOUBLE_MAT4:   glProgramUniformMatrix4dv(program, loc, size, 0, (GLdouble*) buf); break;
+		case GL_DOUBLE_MAT2x3: glProgramUniformMatrix2x3dv(program, loc, size, 0, (GLdouble*) buf); break;
+		case GL_DOUBLE_MAT3x2: glProgramUniformMatrix3x2dv(program, loc, size, 0, (GLdouble*) buf); break;
+		case GL_DOUBLE_MAT2x4: glProgramUniformMatrix2x4dv(program, loc, size, 0, (GLdouble*) buf); break;
+		case GL_DOUBLE_MAT4x2: glProgramUniformMatrix4x2dv(program, loc, size, 0, (GLdouble*) buf); break;
+		case GL_DOUBLE_MAT3x4: glProgramUniformMatrix3x4dv(program, loc, size, 0, (GLdouble*) buf); break;
+		case GL_DOUBLE_MAT4x3: glProgramUniformMatrix4x3dv(program, loc, size, 0, (GLdouble*) buf); break;
 		default: croak("Unimplemented type %d for uniform %s", type, name);
 		}
 	}

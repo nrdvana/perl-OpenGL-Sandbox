@@ -4,7 +4,7 @@ use Carp;
 use Try::Tiny;
 use OpenGL::Sandbox qw(
 	GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_TEXTURE_MAG_FILTER GL_TEXTURE_WRAP_S GL_TEXTURE_WRAP_T
-	glTexParameteri glBindTexture gen_textures delete_texture
+	glTexParameteri glBindTexture gen_textures delete_textures
 );
 use OpenGL::Sandbox::MMap;
 
@@ -144,7 +144,7 @@ sub bind {
 
 sub DESTROY {
 	my $self= shift;
-	delete_texture(delete $self->{tx_id}) if $self->has_tx_id;
+	delete_textures(delete $self->{tx_id}) if $self->has_tx_id;
 }
 
 =head2 load

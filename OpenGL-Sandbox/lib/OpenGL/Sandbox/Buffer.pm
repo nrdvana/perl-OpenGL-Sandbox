@@ -120,7 +120,7 @@ sub load_at {
 
 sub DESTROY {
 	my $self= shift;
-	delete_buffer(delete $self->{id}) if $self->has_id;
+	delete_buffers(delete $self->{id}) if $self->has_id;
 }
 
 1;

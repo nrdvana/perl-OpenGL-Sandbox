@@ -6,7 +6,7 @@ use OpenGL::Sandbox::MMap;
 use OpenGL::Sandbox qw(
 	warn_gl_errors
 	glCreateProgram glDeleteProgram glAttachShader glDetachShader glLinkProgram glUseProgram 
-	get_program_uniforms
+	get_program_uniforms glGetAttribLocation_c
 	GL_LINK_STATUS GL_FALSE GL_TRUE GL_CURRENT_PROGRAM GL_ACTIVE_UNIFORMS
 );
 BEGIN {
@@ -178,7 +178,10 @@ on the number or type of values given.
 
 sub attr_by_name {
 	my ($self, $name)= @_;
-	$self->_attribute_cache->{$name} //= $self->_attr_by_name($name);
+	$self->_attribute_cache->{$name} //= do {
+		my $loc= glGetAttribLocation_c($self->id, $name);
+		$loc > 0? $loc : undef;
+	};
 }
 
 sub uniform_location {

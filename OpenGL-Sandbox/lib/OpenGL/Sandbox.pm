@@ -39,13 +39,13 @@ export qw( =$res -resources(1) tex new_texture buffer new_buffer shader new_shad
 	program new_program font
 	make_context current_context next_frame
 	gl_error_name get_gl_errors log_gl_errors warn_gl_errors
-	gen_textures delete_texture round_up_pow2
+	gen_textures delete_textures round_up_pow2
 	),
 	-V1 => sub { Module::Runtime::use_module('OpenGL::Sandbox::V1','0.04'); },
 	# Conditionally export the stuff that gets conditionally compiled
 	map { __PACKAGE__->can($_)? ($_) : () } qw(
 	get_program_uniforms set_uniform get_glsl_type_name
-	gen_buffers delete_buffer load_buffer_data load_buffer_sub_data
+	gen_buffers delete_buffers load_buffer_data load_buffer_sub_data
 	);
 
 =head1 SYNOPSIS
