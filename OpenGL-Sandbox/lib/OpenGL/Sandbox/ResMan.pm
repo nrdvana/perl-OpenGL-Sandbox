@@ -42,6 +42,7 @@ The path where resources are located, adhering to the basic layout of:
   ./font/         # fonts compatible with libfreetype
   ./font/default  # file or symlink for default font.  Required.
   ./shader/       # GLSL shaders with extension '.glsl', '.frag', or '.vert'
+  ./buffer/       # raw data to be loaded into Buffer Objects
 
 You can override these implied sub-paths with the following attributes:
 
@@ -129,6 +130,7 @@ has shader_path       => ( is => 'rw', default => sub {'shader'}, trigger => sub
 has font_path         => ( is => 'rw', default => sub {'font'},   trigger => sub { shift->_clear_font_dir_cache } );
 has tex_config        => ( is => 'rw', default => sub { +{} } );
 has buffer_config     => ( is => 'rw', default => sub { +{} } );
+has vertex_array_config => ( is => 'rw', default => sub { +{} } );
 has shader_config     => ( is => 'rw', default => sub { +{} } );
 has font_config       => ( is => 'rw', default => sub { +{} } );
 has program_config    => ( is => 'rw', default => sub { +{} } );
@@ -155,6 +157,7 @@ sub _build_tex_default_fmt {
 has _texture_dir_cache => ( is => 'lazy', clearer => 1 );
 has _texture_cache     => ( is => 'ro', default => sub { +{} } );
 has _buffer_cache      => ( is => 'ro', default => sub { +{} } );
+has _vertex_array_cache=> ( is => 'ro', default => sub { +{} } );
 has _shader_dir_cache  => ( is => 'lazy', clearer => 1 );
 has _shader_cache      => ( is => 'ro', default => sub { +{} } );
 has _program_cache     => ( is => 'ro', default => sub { +{} } );
@@ -381,24 +384,56 @@ Buffer objects require OpenGL version 2.0 or above.
 
 sub buffer {
 	my ($self, $name)= @_;
-	$self->_buffer_cache->{$name} || do {
-		defined $self->buffer_config->{$name} or croak "No such buffer '$name'";
-		$self->_new_buffer($name);
-	};
+	$self->_buffer_cache->{$name} || (
+		defined $self->buffer_config->{$name}? $self->new_buffer($name)
+			: $self->load_buffer($name)
+	);
+}
+
+sub load_buffer {
+	my ($self, $name, %options)= @_;
+	require OpenGL::Sandbox::Buffer;
+	croak "Unimplemented: load buffer from disk";
 }
 
 sub new_buffer {
-	# Loading Shader might die on old OpenGL, so use a trampoline before accessing for first time.
-	require OpenGL::Sandbox::Buffer;
-	no warnings 'redefine';
-	*new_buffer= *_new_buffer;
-	shift->_new_buffer(@_);
-}
-sub _new_buffer {
 	my ($self, $name, %options)= @_;
+	require OpenGL::Sandbox::Buffer;
 	$self->_buffer_cache->{$name} and croak "Buffer '$name' already exists";
 	$self->_buffer_cache->{$name}= OpenGL::Sandbox::Buffer->new(
 		%{ $self->buffer_config->{$name} // {} },
+		%options
+	);
+}
+
+=head2 vertex_array
+
+  my $vertex_array= $res->vertex_array( $name );
+
+Return an existing or configured L<OpenGL::Sandbox::VertexArray|Vertex Array>.
+
+=head2 new_vertex_array
+
+  my $vertex_array= $res->new_vertex_array( $name, %options );
+
+Create a new L<OpenGL::Sandbox::VertexArray|Vertex Array> from the given arguments, and cache
+it as C<$name>.
+
+=cut
+
+sub vertex_array {
+	my ($self, $name)= @_;
+	$self->_vertex_array_cache->{$name} || do {
+		defined $self->vertex_array_config->{$name} or croak "No such Vertex Array '$name'";
+		$self->new_vertex_array($name);
+	};
+}
+sub new_vertex_array {
+	my ($self, $name, %options)= @_;
+	require OpenGL::Sandbox::VertexArray;
+	$self->_vertex_array_cache->{$name} and croak "Vertex Array '$name' already exists";
+	$self->_vertex_array_cache->{$name}= OpenGL::Sandbox::VertexArray->new(
+		%{ $self->vertex_array_config->{$name} // {} },
 		%options
 	);
 }

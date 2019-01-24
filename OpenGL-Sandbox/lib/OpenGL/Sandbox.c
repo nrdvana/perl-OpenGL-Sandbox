@@ -267,6 +267,47 @@ void delete_buffers(unsigned buf_id) {
 }
 
 #endif
+#ifdef GL_VERSION_3_0
+void gen_vertex_arrays(int count) {
+	Inline_Stack_Vars;
+	GLuint static_buf[16], *buf, i;
+
+	if (count < sizeof(static_buf)/sizeof(GLuint))
+		buf= static_buf;
+	else {
+		Newx(buf, count, GLuint);
+		SAVEFREEPV(buf); /* perl frees it for us */
+	}
+	glGenVertexArrays(count, buf);
+	EXTEND(SP, count);
+	Inline_Stack_Reset;
+	for (i= 0; i < count; i++)
+		Inline_Stack_Push(newSViv(buf[i]));
+	Inline_Stack_Done;
+	Inline_Stack_Return(count);
+}
+
+void delete_vertex_arrays(unsigned buf_id) {
+	Inline_Stack_Vars;
+	GLuint static_buf[16], *buf;
+	int dest_i, i, n= sizeof(static_buf)/sizeof(GLuint);
+	buf= static_buf;
+	/* first pass, try static buffer */
+	for (i= 0, dest_i= 0; i < Inline_Stack_Items; i++)
+		_recursive_pack(buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
+	n= dest_i;
+	/* If too many, second pass with dynamic buffer */
+	if (n > sizeof(static_buf)/sizeof(GLuint)) {
+		Newx(buf, n, GLuint);
+		SAVEFREEPV(buf); /* perl frees it for us */
+		for (i= 0, dest_i= 0; i < Inline_Stack_Items; i++)
+			_recursive_pack(buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
+	}
+
+	glDeleteVertexArrays(n, buf);
+	Inline_Stack_Void;
+}
+#endif
 
 /* This function operates on the idea that a power of two texture composed of
  * RGB or RGBA pixels must either be 4*4*4...*4 or 4*4*4...*3 bytes long.

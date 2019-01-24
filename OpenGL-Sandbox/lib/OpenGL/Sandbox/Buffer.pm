@@ -4,7 +4,7 @@ use Carp;
 use Try::Tiny;
 use OpenGL::Sandbox::MMap;
 use OpenGL::Sandbox qw(
-	warn_gl_errors gen_buffers delete_buffer load_buffer_data load_buffer_sub_data
+	warn_gl_errors gen_buffers delete_buffers load_buffer_data load_buffer_sub_data
 	glBindBuffer GL_STATIC_DRAW
 );
 
