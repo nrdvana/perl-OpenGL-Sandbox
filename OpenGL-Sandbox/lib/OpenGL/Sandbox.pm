@@ -35,6 +35,19 @@ BEGIN {
 }
 require constant;
 
+export qw( =$res -resources(1) tex new_texture buffer new_buffer shader new_shader
+	program new_program font
+	make_context current_context next_frame
+	gl_error_name get_gl_errors log_gl_errors warn_gl_errors
+	gen_textures delete_texture round_up_pow2
+	),
+	-V1 => sub { Module::Runtime::use_module('OpenGL::Sandbox::V1','0.04'); },
+	# Conditionally export the stuff that gets conditionally compiled
+	map { __PACKAGE__->can($_)? ($_) : () } qw(
+	get_program_uniforms set_uniform get_glsl_type_name
+	gen_buffers delete_buffer load_buffer_data load_buffer_sub_data
+	);
+
 =head1 SYNOPSIS
 
   use OpenGL::Sandbox qw( -V1 :all );
@@ -74,7 +87,7 @@ A class providing fonts, but only for OpenGL 1.x
 
 =back
 
-=head1 EXPORTS
+=head1 SPECIAL EXPORTS
 
 =head2 GL_$CONSTANT, gl$Function
 
@@ -83,66 +96,34 @@ L<OpenGL::Modern>.   When exported by name, constants will be exported as true p
 However, the full selection of GL constants and functions is *not* available directly from this
 module's namespace.  i.e. C<< OpenGL::Sandbox::GL_TRUE() >> does not work.
 
+=head2 -V1
+
+Loads L<OpenGL::SandBox::V1> (which must be installed separately) and makes all its symbols
+available for importing.  That module contains many "sugar" functions to make the
+GL 1.x API more friendly.  These aren't much use in modern OpenGL, and actually missing in
+various OpenGL implementations (like ES) so they are supplied as a separate dist.
+
+If L<OpenGL::SandBox::V1> is loaded, the C<:all> export will include everything from that
+module as well.
+
+=head2 :all
+
+This *only* exports the symbols defined by this module collection, *not* every OpenGL symbol,
+even though this module can export OpenGL symbols.  However, this module exports lots of short
+(convenient) names which have a high chance of conflicting with your own symbols, so you should
+think twice before using C<:all> in any long-lived code that you want to maintain.
+
 =head2 $res
 
 Returns a default global instance of the L<resource manager|OpenGL::Sandbox::ResMan>
 with C<path> pointing to the current directory.
 
-=head2 tex
+=head2 -resources => \%config
 
-Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->tex >>
-
-=head2 font
-
-Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->font >>
-
-Note that you need to install L<OpenGL::Sandbox::V1::FTGLFont> in order to get font support,
-currently.  Other font providers might be added later.
-
-=head2 shader
-
-Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->shader >>
-
-=head2 program
-
-Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->program >>
+This isn't an actual export, but gives you a quick way to configure the default resource
+manager instance.  Each key/value of C<%config> is applied as a method call.
 
 =cut
-
-sub tex  { OpenGL::Sandbox::ResMan->default_instance->tex(@_) }
-sub font { OpenGL::Sandbox::ResMan->default_instance->font(@_) }
-sub shader { OpenGL::Sandbox::ResMan->default_instance->shader(@_) }
-sub program { OpenGL::Sandbox::ResMan->default_instance->program(@_) }
-
-=head2 -V1
-
-Loads L<OpenGL::SandBox::V1> (which must be installed separately) and makes all its symbols
-available for importing.  This module contains many "sugar" functions to make the
-GL 1.x API more friendly.
-
-C<-V2>, C<-V3>, etc will likewise import everything from packages named C<OpenGL::SandBox::V$_>
-which do not currently exist, but could be authored in the future.
-
-=head2 :all
-
-This *only* exports the symbols defined by this module collection, *not* every OpenGL symbol.
-
-=cut
-
-export qw( =$res -resources(1) font tex shader program
-	make_context current_context next_frame
-	gl_error_name get_gl_errors log_gl_errors warn_gl_errors
-	gen_textures delete_texture gen_buffers delete_buffer round_up_pow2
-	load_buffer_data load_buffer_sub_data
-	),
-	-V1 => sub { Module::Runtime::use_module('OpenGL::Sandbox::V1','0.04'); },
-	# Conditionally export the stuff that gets conditionally compiled
-	map { __PACKAGE__->can($_)? ($_) : () } qw(
-	get_program_uniforms set_uniform get_glsl_type_name
-	);
-
-# Called when exporting '$res'
-sub _generateScalar_res { \OpenGL::Sandbox::ResMan->default_instance; }
 
 sub resources {
 	my ($self, $config)= @_;
@@ -153,6 +134,10 @@ sub resources {
 	}
 }
 
+# Called when exporting '$res'
+sub _generateScalar_res { \OpenGL::Sandbox::ResMan->default_instance; }
+
+# Called for unknown exports, including all the GL_CONSTANT and glFuncName
 sub exporter_autoload_symbol {
 	my ($self, $sym)= @_;
 	if ($sym =~ /^(?:(GL_)|(gl[a-zA-Z]))/) {
@@ -177,6 +162,59 @@ sub exporter_autoload_symbol {
 	}
 	return $self->next::method($sym);
 }
+
+=head1 EXPORTED FUNCTIONS
+
+=head2 tex
+
+Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->tex >>
+
+=head2 new_texture
+
+Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->new_texture >>
+
+=head2 buffer
+
+Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->buffer >>
+
+=head2 new_buffer
+
+Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->new_buffer >>
+
+=head2 shader
+
+Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->shader >>
+
+=head2 new_shader
+
+Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->new_shader >>
+
+=head2 program
+
+Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->program >>
+
+=head2 new_program
+
+Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->new_program >>
+
+=head2 font
+
+Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->font >>
+
+Note that you need to install L<OpenGL::Sandbox::V1::FTGLFont> in order to get font support,
+currently.  Other font providers might be added later.
+
+=cut
+
+sub tex         { OpenGL::Sandbox::ResMan->default_instance->tex(@_) }
+sub new_texture { OpenGL::Sandbox::ResMan->default_instance->new_texture(@_) }
+sub buffer      { OpenGL::Sandbox::ResMan->default_instance->buffer(@_) }
+sub new_buffer  { OpenGL::Sandbox::ResMan->default_instance->new_buffer(@_) }
+sub shader      { OpenGL::Sandbox::ResMan->default_instance->shader(@_) }
+sub new_shader  { OpenGL::Sandbox::ResMan->default_instance->new_shader(@_) }
+sub program     { OpenGL::Sandbox::ResMan->default_instance->program(@_) }
+sub new_program { OpenGL::Sandbox::ResMan->default_instance->new_program(@_) }
+sub font        { OpenGL::Sandbox::ResMan->default_instance->font(@_) }
 
 =head2 make_context
 
@@ -347,6 +385,8 @@ Emit any GL errors using 'warn'.  Returns true if any errors were reported.
 
 =cut
 
+# gl_error_name comes from sandbox.c
+
 sub get_gl_errors {
 	my $self= shift;
 	my (@names, $e);
@@ -373,6 +413,47 @@ use OpenGL::Sandbox::Inline
 	INC => '-I'.do{ my $x= __FILE__; $x =~ s|/[^/]+$|/|; abs_path($x) }.' -I/usr/include/ffmpeg',
 	LIBS => '-lGL -lswscale',
 	CCFLAGSEX => '-Wall -g3 -Os';
+
+=head2 gen_textures
+
+  my @texture_ids= gen_textures($count);
+
+Wrapper around glGenTextures, since implementation varies between OpenGL and OpenGL::Modern
+
+=head2 delete_textures
+
+  delete_textures(@ids);
+
+Wrapper around glDeleteTextures, since implementation varies between OpenGL and OpenGL::Modern
+
+=head2 gen_buffers
+
+  my @buffer_ids= gen_buffers($count);
+
+Wrapper around glGenBuffers, since implementation varies between OpenGL and OpenGL::Modern
+
+=head2 delete_buffers
+
+  delete_buffers(@ids);
+
+Wrapper around glDeleteBuffers, since implementation varies between OpenGL and OpenGL::Modern
+
+=head2 load_buffer_data
+
+  load_buffer_data( $buffer_target, $size, $data, $usage );
+
+Wrapper around glBufferData.  C<$size> may be undef, in which case it will use the length of
+C<$data>.  C<$usage> may also be undef, in which case it will default to C<GL_STATIC_DRAW>.
+
+=head2 load_buffer_sub_data
+
+  load_buffer_sub_data( $buffer_target, $offset, $size, $data, $data_offset );
+
+Wrapper around glBufferSubData.  C<$size> may be undef, in which case it uses the length of
+C<$data>.  C<$data_offset> is an optional offset from the start of C<$data> to avoid the
+need for substring operations on the perl side.
+
+=cut
 
 require OpenGL::Sandbox::ResMan;
 
