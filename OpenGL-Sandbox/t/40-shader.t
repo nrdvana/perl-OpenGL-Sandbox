@@ -56,13 +56,14 @@ sub test_shader_program {
 	$prog->activate;
 	ok( eval{ $prog->set_uniform('mat', @mat); }, 'set_uniform values' ) or diag $@;
 	ok( eval{ $prog->set_uniform('mat', \@mat); }, 'set_uniform arrayref' ) or diag $@;
+	ok( eval{ $prog->set_uniform('mat', [ [0,1,2,3], [4,5,6,7], [8,9,10,11], [12,13,14,15] ]); }, 'set_uniform array-of-array' ) or diag $@;
 	SKIP: {
 		skip "OpenGL::Array not available", 3 unless eval { require OpenGL::Array; 1; };
 		
 		my $a= new_ok( 'OpenGL::Array', [ 16, GL_FLOAT ] );
 		$a->assign(0, @mat) if $a;
 		ok( eval{ $prog->set_uniform('mat', $a); }, 'set_uniform OpenGL::Array' ) or diag $@;
-		ok( eval{ $prog->set_uniform('mat', $a, $a->ptr); }, 'set_uniform OpenGL::Array' ) or diag $@;
+		ok( eval{ $prog->set_uniform('mat', \($a->retrieve_data(0, 16*4))); }, 'set_uniform packed buffer' ) or diag $@;
 	}
 	done_testing;
 }
