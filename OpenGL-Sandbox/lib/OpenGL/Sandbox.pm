@@ -58,11 +58,40 @@ export qw( =$res -resources(1) tex new_texture buffer new_buffer shader new_shad
   font('Arial.ttf')->render("Hello World");
   next_frame;
 
-(or, modern stuff)
+(or, something more exciting and modern)
 
-  use OpenGL::Sandbox qw( :all );
+  #! /usr/bin/env perl
+  use strict;
+  use warnings;
+  use Time::HiRes 'time';
+  use OpenGL::Sandbox qw( :all GL_FLOAT GL_TRIANGLES glDrawArrays );
+  use OpenGL::Sandbox -resources => {
+    path => './t/data',
+    program_config => {
+      demo => { shaders => { vert => 'xy_screen.vert' } },
+    },
+    vertex_array_config => {
+      unit_quad => {
+        buffer => {
+          data => pack('f*', # two triangles covering entire screen
+            -1.0, -1.0,   1.0, -1.0,    -1.0,  1.0,
+             1.0, -1.0,   1.0,  1.0,    -1.0,  1.0
+          )
+        },
+        attributes => { pos => { size => 2, type => GL_FLOAT } }
+      },
+    },
+  };
   make_context;
-  program('demo')->activate->set_uniform('projection', 1,2,3);
+  new_program('demo', shaders => { frag => $ARGV[0] })->activate;
+  program('demo')->set_uniform("iResolution", 640, 480, 1.0);
+  vao('unit_quad')->apply;
+  my $started= time;
+  while (1) {
+    program('demo')->set_uniform("iGlobalTime", time - $started);
+    glDrawArrays( GL_TRIANGLES, 0, 6 );
+    next_frame;
+  }
 
 =head1 DESCRIPTION
 

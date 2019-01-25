@@ -177,7 +177,12 @@ sub _interpret_config {
 		$name_cfg= $global_config->{$real_name};
 	}
 	my $default_cfg= $global_config->{'*'};
-	%$ctor_args= ( ($default_cfg? (%$default_cfg):()), ($name_cfg? (%$name_cfg):()), %$ctor_args );
+	%$ctor_args= (
+		name => $real_name,
+		($default_cfg? (%$default_cfg):()),
+		($name_cfg? (%$name_cfg):()),
+		%$ctor_args
+	);
 	return ($real_name, $ctor_args);
 }
 
@@ -511,10 +516,12 @@ sub new_program {
 	$self->_program_cache->{$name}= $self->_program_cache->{$real_name} //= do {
 		# perform a deeper merge of the ->{shaders} element
 		my $default_cfg= $self->program_config->{'*'};
+		my $name_cfg= $self->program_config->{$real_name};
 		$ctor_args->{shaders}= {
 			$self->_shaders_matching_name($real_name),
-			( $ctor_args->{shaders}? %{ $ctor_args->{shaders} } : () ),
+			( $options{shaders}? %{ $options{shaders} } : () ),
 			( $default_cfg && $default_cfg->{shaders}? %{ $default_cfg->{shaders} } : () ),
+			( $name_cfg && $name_cfg->{shaders}? %{ $name_cfg->{shaders} } : () ),
 		};
 
 		# Now, translate the shader names into shader objects
