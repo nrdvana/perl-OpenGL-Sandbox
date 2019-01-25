@@ -114,7 +114,7 @@ Returns C<$self> for convenient chaining.
 
 sub activate {
 	my $self= shift;
-	$self->_assemble unless $self->assembled;
+	$self->assemble unless $self->assembled;
 	glUseProgram($self->id);
 	return $self;
 }

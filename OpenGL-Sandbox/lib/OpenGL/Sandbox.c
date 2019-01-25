@@ -183,6 +183,12 @@ void _recursive_pack(void *dest, int *dest_i, int dest_lim, int component_type, 
  * wrapper between OpenGL and OpenGL::Modern
  */
 
+int _gl_get_integer(int id) {
+	GLint i;
+	glGetIntegerv(id, &i);
+	return i;
+}
+
 void gen_textures(int count) {
 	Inline_Stack_Vars;
 	GLuint static_buf[16], *buf, i;
