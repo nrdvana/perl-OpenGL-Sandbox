@@ -2,6 +2,7 @@ package OpenGL::Sandbox::Buffer;
 use Moo;
 use Carp;
 use Try::Tiny;
+use Log::Any '$log';
 use OpenGL::Sandbox::MMap;
 use OpenGL::Sandbox qw(
 	warn_gl_errors gen_buffers delete_buffers load_buffer_data load_buffer_sub_data
@@ -55,13 +56,20 @@ If this field is defined at the time of the next call to L</bind>, this data wil
 immediately be loaded into the buffer with glBufferData.  The field will then be cleared, to
 avoid holding onto large blobs of data.
 
+=head2 filename
+
+If passed to the constructor, this implies an L</autoload> from the file.  Else it is just
+for informational purposes.
+
 =cut
 
+has name       => ( is => 'rw' );
 has target     => ( is => 'rw' );
 has usage      => ( is => 'rw' );
 has id         => ( is => 'lazy', predicate => 1 );
 sub _build_id { gen_buffers(1) }
 
+has filename   => ( is => 'rw' );
 has autoload   => ( is => 'rw' );
 
 =head1 METHODS
@@ -77,6 +85,9 @@ sub BUILD {
 	my ($self, $args)= @_;
 	if ($args->{data} && !defined $self->autoload) {
 		$self->autoload($args->{data});
+	}
+	if ($self->filename && !defined $self->autoload) {
+		$self->autoload(OpenGL::Sandbox::MMap->new($self->filename));
 	}
 }
 
@@ -99,6 +110,7 @@ sub bind {
 		$self->load($self->autoload);
 		$self->autoload(undef);
 	} else {
+		$log->debug('glBindBuffer '.$self->id) if $log->is_debug;
 		glBindBuffer($target, $self->id);
 	}
 	$self;
@@ -132,6 +144,7 @@ sub load {
 	$usage //= $self->usage // GL_STATIC_DRAW;
 	$self->usage($usage);
 	my $target= $self->target // croak "No target specified for binding buffer";
+	$log->debug('glBindBuffer '.$self->id.', load_buffer_data') if $log->is_debug;
 	glBindBuffer($target, $self->id);
 	load_buffer_data($target, undef, $data, $usage);
 	$self;

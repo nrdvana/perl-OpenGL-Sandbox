@@ -59,7 +59,7 @@ C<filename>, and if it can't guess it will throw an exception.
 
 A method name or coderef of your choice for lazy-loading (and compiling) the code.
 If not set, the loader is determined from the L</filename> and if that is not set, nothing
-loaded on creation of the L<shader_id>.
+gets loaded on creation of the L<shader_id>.
 
 Gets executed as C<< $shader->$loader($filename) >>.
 
@@ -84,24 +84,25 @@ True if the id attribute is defined.
 
 =cut
 
+has name       => ( is => 'rw' );
 has filename   => ( is => 'rw' );
 has source     => ( is => 'rw' );
 has loader     => ( is => 'rw' );
-has loaded     => ( is => 'rw' );
+has prepared   => ( is => 'rw' );
 has type       => ( is => 'rw' );
 has id         => ( is => 'lazy', predicate => 1 );
 
 =head1 METHODS
 
-=head2 load
+=head2 prepare
 
-  $shader->load;
+  $shader->prepare;
 
-Load shader source code from a file into OpenGL.  This does not happen when the
+Load shader source code into OpenGL.  This does not happen when the
 object is first constructed, in case the OpenGL context hasn't been initialized yet.
 It automatically happens when you use a program pipeline that is attached to the shader.
 
-Calls C<< $self->loader->($self, $self->filename) >>.  L</shader_id> will be a valid texture
+Calls C<< $self->loader->($self, $self->filename) >>.  L</shader_id> will be a valid shader
 id after this (assuming the loader doesn't die).  The default loader also compiles the shader,
 and throws an exception if compilation fails.
 
@@ -109,11 +110,19 @@ Returns C<$self> for convenient chaining.
 
 =cut
 
-sub load {
-	my ($self, $fname)= @_;
-	$fname //= $self->filename;
-	my $loader= $self->loader // '_load';
-	$self->$loader($fname);
+sub prepare {
+	my ($self)= @_;
+	unless ($self->prepared) {
+		if (defined $self->source) {
+			$self->_compile_source($self->source);
+		} elsif (defined $self->filename) {
+			# TODO: check for binary pre-compiled shaders
+			$self->_compile_source(OpenGL::Sandbox::MMap->new($self->filename), $self->filename);
+		} else {
+			croak "No 'source' or 'filename' given for shader";
+		}
+		$self->prepared(1);
+	}
 	$self;
 }
 
@@ -129,12 +138,10 @@ sub _build_id {
 	$id;
 }
 
-sub _load {
-	my ($self, $fname)= @_;
+sub _compile_source {
+	my ($self, $source, $fname)= @_;
 	my $id= $self->id;
-	# TODO: check for binary pre-compiled shaders
-	my $source= $self->source // do { ${OpenGL::Sandbox::MMap->new($fname)} };
-	glShaderSource_p($id, $source);
+	glShaderSource_p($id, ref $source? $$source : $source);
 	warn_gl_errors and croak("glShaderSource failed (for $fname)");
 	glCompileShader($id);
 	warn_gl_errors and croak("glCompileShader failed (for $fname)");
@@ -142,13 +149,11 @@ sub _load {
 		my $log= glGetShaderInfoLog_p($id);
 		croak "Error in shader: $log";
     }
-	$self->loaded(1);
 }
 
 sub DESTROY {
 	my $self= shift;
-	glDeleteShader($self->id) if $self->has_id;
-	delete $self->{id};
+	glDeleteShader(delete $self->{id}) if $self->has_id;
 }
 
 1;

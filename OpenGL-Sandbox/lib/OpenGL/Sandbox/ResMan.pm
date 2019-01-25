@@ -9,6 +9,7 @@ use OpenGL::Sandbox::Texture;
 use File::Find ();
 use Scalar::Util 'weaken';
 sub mmap { OpenGL::Sandbox::MMap->new(shift) }
+our @CARP_NOT= ( 'OpenGL::Sandbox' );
 
 # ABSTRACT: Resource manager for OpenGL prototyping
 # VERSION
@@ -143,7 +144,8 @@ has data_path         => ( is => 'rw', default => sub {'data'},   trigger => sub
 
 has tex_config        => ( is => 'rw', default => sub { +{} } );
 has buffer_config     => ( is => 'rw', default => sub { +{} } );
-has vao_config        => ( is => 'rw', default => sub { +{} } );
+has vertex_array_config => ( is => 'rw', default => sub { +{} } );
+*vao_config= *vertex_array_config;
 has shader_config     => ( is => 'rw', default => sub { +{} } );
 has program_config    => ( is => 'rw', default => sub { +{} } );
 has font_config       => ( is => 'rw', default => sub { +{} } );
@@ -399,7 +401,7 @@ sub new_vertex_array {
 	$self->_vao_cache->{$name}= $self->_vao_cache->{$real_name} //= do {
 		# Any references to named buffer objects need replaced with the object.
 		$self->_replace_with_named_buffer($_)
-			for $ctor_args->{buffer}, map $_->{buffer}, @{ $ctor_args->{attributes} // [] };
+			for $ctor_args->{buffer}, map $_->{buffer}, values %{ $ctor_args->{attributes} // {} };
 		OpenGL::Sandbox::VertexArray->new($ctor_args);
 	}
 }

@@ -2,6 +2,7 @@ package OpenGL::Sandbox::VertexArray;
 use Moo 2;
 use Try::Tiny;
 use Carp;
+use Log::Any '$log';
 use OpenGL::Sandbox qw( glGetString GL_VERSION GL_TRUE GL_FALSE GL_CURRENT_PROGRAM GL_ARRAY_BUFFER
 	glGetAttribLocation_c glEnableVertexAttribArray glVertexAttribPointer_c );
 BEGIN {
@@ -10,6 +11,7 @@ BEGIN {
 	# Attempt OpenGL 4.3 imports
 	try { OpenGL::Sandbox->import(qw( glVertexAttribFormat glVertexAttribBinding )) };
 }
+use OpenGL::Sandbox::Buffer;
 
 # ABSTRACT: Object that encapsulates the mapping from buffer to vertex shader
 # VERSION
@@ -31,10 +33,10 @@ The newer versions can cache the configuration in an Object, and the newest vers
 can set it up without mucking around with global state.
 
 This object attempts to represent the configuration in a version-neutral manner.  There are two
-phases: L</construct> and L</apply>.  On old OpenGL, C<construct> does nothing, since there is
+phases: L</prepare> and L</apply>.  On old OpenGL, C<prepare> does nothing, since there is
 no way to cache the results, and C<apply> does all the work.  On new OpenGL (3.0 and up) the
-C<construct> step creates a cached VertexArray, and C<apply> binds it.  All you need to do is
-call C<apply> and it will C<construct> if needed.
+C<prepare> step creates a cached VertexArray, and C<apply> binds it.  All you need to do is
+call C<apply> and it will C<prepare> if needed.
 
 =head1 ATTRIBUTES
 
@@ -80,9 +82,10 @@ This is most useful for the following:
 
 =cut
 
+has name        => ( is => 'rw' );
 has attributes  => ( is => 'rw', default => sub { +{} } );
 has id          => ( is => 'lazy', predicate => 1 );
-has constructed => ( is => 'rw' );
+has prepared    => ( is => 'rw' );
 has buffer      => ( is => 'rw', coerce => sub { ref $_[0] eq 'HASH'? OpenGL::Sandbox::Buffer->new($_[0]) : $_[0] } );
 
 sub _build_id {
@@ -98,7 +101,7 @@ sub DESTROY {
 sub _choose_implementation {
 	my $self= shift;
 	my ($gl_maj, $gl_min)= split /[. ]/, glGetString(GL_VERSION);
-	my $subclass= $gl_maj < 3? 'V2' : $gl_maj < 4 || $gl_min < 3? 'V3' : 'V4_3';
+	my $subclass= $gl_maj < 3? 'V2' : 'V3'; #$gl_maj < 4 || $gl_min < 3? 'V3' : 'V4_3';
 	bless $self, ref($self).'::'.$subclass;
 }
 @OpenGL::Sandbox::VertexArray::V2::ISA= ( __PACKAGE__ );
@@ -127,13 +130,14 @@ sub apply {
 	shift->apply(@_);
 }
 
-sub construct {
+sub prepare {
 	$_[0]->_choose_implementation;
-	shift->construct(@_);
+	shift->prepare(@_);
 }
 
 sub _bind_buffer_unless_current {
 	my ($buffer, $current)= @_;
+	$log->debug("glBindBuffer($buffer)") if $log->is_debug && ((ref $buffer? $buffer->id : $buffer) != $current);
 	if (ref $buffer) {
 		$buffer->bind(GL_ARRAY_BUFFER) unless $buffer->id == $current;
 		return $buffer->id;
@@ -153,8 +157,9 @@ sub OpenGL::Sandbox::VertexArray::V2::apply {
 		my $attr= $self->attributes->{$aname};
 		my $attr_index= $attr->{index}
 			// (ref $program? $program->attr_by_name($aname) : glGetAttribLocation_c($program, $aname));
-		if (defined $attr_index && $attr_index > 0) {
+		if (defined $attr_index && $attr_index >= 0) {
 			$cur_buffer= _bind_buffer_unless_current($attr->{buffer} // $default_buffer, $cur_buffer);
+			$log->debug("VertexAttibPointer for $aname") if $log->is_debug;
 			glVertexAttribPointer_c( $attr_index, $attr->{size}, $attr->{type}, $attr->{normalized}? GL_TRUE:GL_FALSE, $attr->{stride}//0, $attr->{pointer}//0 );
 			glEnableVertexAttribArray( $attr_index );
 		}
@@ -164,27 +169,27 @@ sub OpenGL::Sandbox::VertexArray::V2::apply {
 	}
 }
 
-sub OpenGL::Sandbox::VertexArray::V2::construct {}
+sub OpenGL::Sandbox::VertexArray::V2::prepare {}
 
 sub OpenGL::Sandbox::VertexArray::V3::apply {
 	my ($self, $program, $default_buffer)= @_;
-	$self->constructed? glBindVertexArray($self->id) : $self->construct($program, $default_buffer);
+	$self->prepared? glBindVertexArray($self->id) : $self->prepare($program, $default_buffer);
 }
 
-sub OpenGL::Sandbox::VertexArray::V3::construct {
+sub OpenGL::Sandbox::VertexArray::V3::prepare {
 	my ($self, $program, $default_buffer)= @_;
 	my $vao_id= $self->id || croak("Can't allocate Vertex Array Object ID?");
 	glBindVertexArray($vao_id);
 	OpenGL::Sandbox::VertexArray::V2::apply(@_);
-	$self->constructed(1);
+	$self->prepared(1);
 }
 
 sub OpenGL::Sandbox::VertexArray::V4_3::apply {
 	my ($self, $program, $default_buffer)= @_;
-	$self->constructed? glBindVertexArray($self->id) : $self->construct($program, $default_buffer);
+	$self->prepared? glBindVertexArray($self->id) : $self->prepare($program, $default_buffer);
 }
 
-sub OpenGL::Sandbox::VertexArray::V4_3::construct {
+sub OpenGL::Sandbox::VertexArray::V4_3::prepare {
 	my ($self, $program, $default_buffer)= @_;
 	my $vao_id= $self->id || croak("Can't allocate Vertex Array Object ID?");
 	glBindVertexArray($vao_id);
@@ -195,8 +200,9 @@ sub OpenGL::Sandbox::VertexArray::V4_3::construct {
 		my $attr= $self->attributes->{$aname};
 		my $attr_index= $attr->{index}
 			// (ref $program? $program->attr_by_name($aname) : glGetAttribLocation_c($program, $aname));
-		if (defined $attr_index && $attr_index > 0) {
+		if (defined $attr_index && $attr_index >= 0) {
 			$cur_buffer= _bind_buffer_unless_current($attr->{buffer} // $default_buffer, $cur_buffer);
+			$log->debug("VertexAttibFormat for $aname") if $log->is_debug;
 			glEnableVertexAttribArray($attr_index);
 			glVertexAttribFormat($attr_index, $attr->{size}, $attr->{type}, $attr->{normalized}? GL_TRUE:GL_FALSE, $attr->{stride}//0);
 			glVertexAttribBinding($attr_index, 0);
@@ -205,10 +211,10 @@ sub OpenGL::Sandbox::VertexArray::V4_3::construct {
 			carp "No such attribute '$aname'";
 		}
 	}
-	$self->constructed(1);
+	$self->prepared(1);
 }
 
-# TODO: for 4.5 and up, can construct without binding the VAO, and no need to change
+# TODO: for 4.5 and up, can prepare without binding the VAO, and no need to change
 # buffer binding.
 
 1;

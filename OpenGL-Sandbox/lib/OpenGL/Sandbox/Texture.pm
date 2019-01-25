@@ -91,6 +91,7 @@ Value for GL_TEXTURE_WRAP_T.  See notes on L</min_filter>.
 
 =cut
 
+has name       => ( is => 'rw' );
 has filename   => ( is => 'rw' );
 has loader     => ( is => 'rw' );
 has loaded     => ( is => 'rw' );

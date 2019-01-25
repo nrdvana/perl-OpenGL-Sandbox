@@ -36,7 +36,7 @@ END
 subtest vertex_shader => \&test_vertex_shader;
 sub test_vertex_shader {
 	my $vs= new_ok( 'OpenGL::Sandbox::Shader', [ filename => 'demo.vert', source => $simple_vertex_shader ] );
-	ok( eval { $vs->load; 1 }, 'compiled vertex shader' )
+	ok( eval { $vs->prepare; 1 }, 'compiled vertex shader' )
 		or diag $@;
 	done_testing;
 }
@@ -46,7 +46,7 @@ sub test_shader_program {
 	my $prog= new_ok( 'OpenGL::Sandbox::Program', [ name => 'Test' ], shaders => {} );
 	$prog->{shaders}{vertex}= OpenGL::Sandbox::Shader->new(filename => 'demo.vert', source => $simple_vertex_shader);
 	$prog->{shaders}{fragment}= OpenGL::Sandbox::Shader->new(filename => 'demo.frag', source => $simple_fragment_shader);
-	ok( eval { $prog->assemble; 1 }, 'compiled GL shader pipeline' )
+	ok( eval { $prog->prepare; 1 }, 'compiled GL shader pipeline' )
 		or diag $@;
 	
 	is_deeply( $prog->uniforms, { mat => ['mat',0,GL_FLOAT_MAT4(),1] }, 'found uniforms in program' );

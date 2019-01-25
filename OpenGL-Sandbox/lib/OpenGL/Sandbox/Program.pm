@@ -2,6 +2,7 @@ package OpenGL::Sandbox::Program;
 use Moo;
 use Carp;
 use Try::Tiny;
+use Log::Any '$log';
 use OpenGL::Sandbox::MMap;
 use OpenGL::Sandbox qw(
 	warn_gl_errors
@@ -29,7 +30,7 @@ BEGIN {
 
 =head1 DESCRIPTION
 
-OpenGL shaders get assembled into a pipeline.  In older versions of OpenGL, there was only one
+OpenGL shaders get combined into a pipeline.  In older versions of OpenGL, there was only one
 program composed of a vertex shader and fragment shader, and attaching one of those shaders was
 a global change.  In newer OpenGL, you may assemble multiple program pipelines and switch
 between them.
@@ -58,7 +59,7 @@ True if the id attribute has been lazy-loaded already.
 
 A friendly name for the program (as used by the L<OpenGL::Sandbox::ResMan|Resource Manager>).
 
-=head2 assembled
+=head2 prepared
 
 Boolean; whether the program is ready to run.  This is always 'true' for older global-program
 OpenGL.
@@ -91,7 +92,7 @@ sub _build_id {
 	$id;
 }
 
-has assembled  => ( is => 'rw' );
+has prepared  => ( is => 'rw' );
 has uniforms   => ( is => 'lazy', predicate => 1, clearer => 1 );
 
 sub _build_uniforms {
@@ -114,57 +115,59 @@ Returns C<$self> for convenient chaining.
 
 sub activate {
 	my $self= shift;
-	$self->assemble unless $self->assembled;
+	$self->prepare unless $self->prepared;
 	glUseProgram($self->id);
 	return $self;
 }
 
-=head2 assemble
+=head2 prepare
 
 For relevant implementations, this attaches the shaders and links the program.
 If it fails, this throws an exception.  For OpenGL 4 implementation, this only happens
-once, and any changes to L</shaders> afterward are ignored.  Use L</disassemble> to remove
+once, and any changes to L</shaders> afterward are ignored.  Use L</unprepare> to remove
 the compiled state and be able to rearrange the shaders.
 
 Returns C<$self> for convenient chaining.
 
 =cut
 
-sub assemble {
+sub prepare {
 	my $self= shift;
-	return if $self->assembled;
+	return if $self->prepared;
 	my $id= $self->id;
 	warn_gl_errors;
 	for ($self->shader_list) {
-		$_->load; # also compiles
+		$_->prepare;
+		$log->debug("Attach shader $_") if $log->is_debug;
 		glAttachShader($id, $_->id);
 		!warn_gl_errors
 			or croak "glAttachShader failed: ".glGetProgramInfoLog_p($id);
 	}
+	$log->debug("Link program ".$self->name) if $log->is_debug;
     glLinkProgram($id);
 	!warn_gl_errors and glGetProgramiv_p($id, GL_LINK_STATUS) == GL_TRUE
 		or croak "glLinkProgram failed: ".glGetProgramInfoLog_p($id);
-	$self->assembled(1);
+	$self->prepared(1);
 	return $self;
 }
 
-sub disassemble {
+sub unprepare {
 	my $self= shift;
-	return unless $self->has_id && $self->assembled;
+	return unless $self->has_id && $self->prepared;
 	glUseProgram(0) if glGetIntegerv_p(GL_CURRENT_PROGRAM, 1) == $self->id;
 	$_->has_id && glDetachShader($self->id, $_->id) for $self->shader_list;
 	$self->clear_uniforms;
-	$self->assembled(0);
+	$self->prepared(0);
 	return $self;
 }
 
 =head2 attr_by_name
 
-Return the attribute ID of the given name, for the assembled program.
+Return the attribute ID of the given name, for the prepared program.
 
 =head2 uniform_location
 
-Return the uniform ID of the given name, for the assembled program.
+Return the uniform ID of the given name, for the prepared program.
 
 =head2 set_uniform
 
@@ -180,7 +183,7 @@ sub attr_by_name {
 	my ($self, $name)= @_;
 	$self->_attribute_cache->{$name} //= do {
 		my $loc= glGetAttribLocation_c($self->id, $name);
-		$loc > 0? $loc : undef;
+		$loc >= 0? $loc : undef;
 	};
 }
 
@@ -199,7 +202,7 @@ sub set_uniform {
 sub DESTROY {
 	my $self= shift;
 	if ($self->has_id) {
-		$self->disassemble;
+		$self->unprepare;
 		glDeleteProgram(delete $self->{id});
 	}
 }
