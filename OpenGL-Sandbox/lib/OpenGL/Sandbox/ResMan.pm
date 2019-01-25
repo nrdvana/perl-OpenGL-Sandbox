@@ -7,7 +7,8 @@ use Log::Any '$log';
 use OpenGL::Sandbox::MMap;
 use OpenGL::Sandbox::Texture;
 use File::Find ();
-use Scalar::Util ();
+use Scalar::Util 'weaken';
+sub mmap { OpenGL::Sandbox::MMap->new(shift) }
 
 # ABSTRACT: Resource manager for OpenGL prototyping
 # VERSION
@@ -42,7 +43,7 @@ The path where resources are located, adhering to the basic layout of:
   ./font/         # fonts compatible with libfreetype
   ./font/default  # file or symlink for default font.  Required.
   ./shader/       # GLSL shaders with extension '.glsl', '.frag', or '.vert'
-  ./buffer/       # raw data to be loaded into Buffer Objects
+  ./data/         # raw data to be loaded into Buffer Objects
 
 You can override these implied sub-paths with the following attributes:
 
@@ -51,6 +52,8 @@ You can override these implied sub-paths with the following attributes:
 =item tex_path
 
 =item shader_path
+
+=item data_path
 
 =item font_path
 
@@ -92,6 +95,11 @@ Example tex_config:
     alias1  => 'tile1',
   }
 
+=head2 buffer_config
+
+A hashref of configuration for named L<OpenGL::Sandbox::Buffer|buffer objects>.
+The hash key of C<'*'> can be used to apply default values to every buffer.
+
 =head2 shader_config
 
 A hashref of shader names which holds default L<OpenGL::Sandbox::Shader|shader> constructor
@@ -125,17 +133,20 @@ has path              => ( is => 'rw', default => sub {'.'}, trigger => sub {
 	$_[0]->_clear_font_dir_cache;
 });
 *resource_root_dir= *path; # back-compat name
+
 has tex_path          => ( is => 'rw', default => sub {'tex'},    trigger => sub { shift->_clear_texture_dir_cache } );
-has shader_path       => ( is => 'rw', default => sub {'shader'}, trigger => sub { shift->_clear_shader_dir_cache } );
-has font_path         => ( is => 'rw', default => sub {'font'},   trigger => sub { shift->_clear_font_dir_cache } );
-has tex_config        => ( is => 'rw', default => sub { +{} } );
-has buffer_config     => ( is => 'rw', default => sub { +{} } );
-has vertex_array_config => ( is => 'rw', default => sub { +{} } );
-has shader_config     => ( is => 'rw', default => sub { +{} } );
-has font_config       => ( is => 'rw', default => sub { +{} } );
-has program_config    => ( is => 'rw', default => sub { +{} } );
 has tex_fmt_priority  => ( is => 'rw', lazy => 1, builder => 1 );
 has tex_default_fmt   => ( is => 'rw', lazy => 1, builder => 1 );
+has shader_path       => ( is => 'rw', default => sub {'shader'}, trigger => sub { shift->_clear_shader_dir_cache } );
+has font_path         => ( is => 'rw', default => sub {'font'},   trigger => sub { shift->_clear_font_dir_cache } );
+has data_path         => ( is => 'rw', default => sub {'data'},   trigger => sub { shift->_clear_data_dir_cache } );
+
+has tex_config        => ( is => 'rw', default => sub { +{} } );
+has buffer_config     => ( is => 'rw', default => sub { +{} } );
+has vao_config        => ( is => 'rw', default => sub { +{} } );
+has shader_config     => ( is => 'rw', default => sub { +{} } );
+has program_config    => ( is => 'rw', default => sub { +{} } );
+has font_config       => ( is => 'rw', default => sub { +{} } );
 
 sub _build_tex_fmt_priority {
 	my $self= shift;
@@ -154,16 +165,41 @@ sub _build_tex_default_fmt {
 	return $first // 'bgr';
 }
 
+sub _interpret_config {
+	my ($global_config, $name, $ctor_args)= @_;
+	my $name_cfg= $global_config->{$name};
+	# name_cfg might be a plain scalar, meaning it is an alias for a different name
+	my $real_name= $name;
+	while (defined $name_cfg && !ref $name_cfg) {
+		$real_name= $name_cfg;
+		$name_cfg= $global_config->{$real_name};
+	}
+	my $default_cfg= $global_config->{'*'};
+	%$ctor_args= ( ($default_cfg? (%$default_cfg):()), ($name_cfg? (%$name_cfg):()), %$ctor_args );
+	return ($real_name, $ctor_args);
+}
+
 has _texture_dir_cache => ( is => 'lazy', clearer => 1 );
 has _texture_cache     => ( is => 'ro', default => sub { +{} } );
-has _buffer_cache      => ( is => 'ro', default => sub { +{} } );
-has _vertex_array_cache=> ( is => 'ro', default => sub { +{} } );
+has _data_dir_cache    => ( is => 'lazy', clearer => 1 );
+has _buffer_cache      => ( is => 'lazy', clearer => 1 );
+has _vao_cache         => ( is => 'lazy', clearer => 1 );
 has _shader_dir_cache  => ( is => 'lazy', clearer => 1 );
-has _shader_cache      => ( is => 'ro', default => sub { +{} } );
-has _program_cache     => ( is => 'ro', default => sub { +{} } );
-has _fontdata_cache    => ( is => 'ro', default => sub { +{} } );
-has _font_cache        => ( is => 'ro', default => sub { +{} } );
+has _shader_cache      => ( is => 'lazy', clearer => 1 );
+has _program_cache     => ( is => 'lazy', clearer => 1 );
+has _mmap_cache        => ( is => 'ro', default => sub { +{} } );
+has _font_cache        => ( is => 'lazy', clearer => 1 );
 has _font_dir_cache    => ( is => 'lazy', clearer => 1 );
+
+sub _build__buffer_cache  { require OpenGL::Sandbox::Buffer; return {}; }
+sub _build__vao_cache     { require OpenGL::Sandbox::VertexArray; return {}; }
+sub _build__shader_cache  { require OpenGL::Sandbox::Shader; return {}; }
+sub _build__program_cache { require OpenGL::Sandbox::Program; return {}; }
+sub _build__font_cache {
+	eval { require OpenGL::Sandbox::V1::FTGLFont; 1 }
+		or croak "Font support requires module L<OpenGL::Sandbox::V1::FTGLFont>, and OpenGL 1.x\n$@";
+	return {};
+}
 
 sub _interpret_path {
 	my ($self, $spec)= @_;
@@ -176,8 +212,18 @@ sub _build__texture_dir_cache {
 sub _build__shader_dir_cache {
 	$_[0]->_cache_directory($_[0]->_interpret_path($_[0]->shader_path));
 }
+sub _build__data_dir_cache {
+	$_[0]->_cache_directory($_[0]->_interpret_path($_[0]->data_path));
+}
 sub _build__font_dir_cache {
 	$_[0]->_cache_directory($_[0]->_interpret_path($_[0]->font_path));
+}
+
+sub _get_cached_mmap {
+	my ($self, $file_info)= @_;
+	my $mmap= $self->_mmap_cache->{$file_info->[0]} //= mmap($file_info->[1]);
+	weaken($self->_mmap_cache->{$file_info->[0]}); # only keep weak references
+	$mmap;
 }
 
 =head1 METHODS
@@ -204,125 +250,26 @@ sub BUILD {
 	$log->debug("OpenGL::Sandbox::ResMan loaded");
 }
 
-=head2 release_gl
+=head2 texture
 
-Free all OpenGL resources currently referenced by the texture and image cache.
-
-=cut
-
-sub release_gl {
-	my $self= shift;
-	$_->release_gl for values %{$self->_font_cache};
-	%{$self->_tex_cache}= ();
-}
-
-=head2 font
-
-  $font= $res->font( $name );
-
-Retrieve a named font, loading it if needed.  See L</load_font>.
-
-If the font cannot be loaded, this logs a warning and returns the 'default'
-font rather than throwing an exception or returning undef.
-
-=cut
-
-sub font {
-	my ($self, $name)= @_;
-	$self->_font_cache->{$name} ||=
-		( try { $self->load_font($name) }
-		  catch { chomp(my $err= "Font '$name': $_"); $log->error($err); undef; }
-		)
-		|| $self->_font_cache->{default}
-		|| $self->load_font('default');
-}
-
-=head2 load_font
-
-  $font= $res->load_font( $name, %config );
-
-Load a font by name.  By default, a font file of the same name is loaded as a
-TextureFont and rendered at 24px.  If multiple named fonts reference the same
-file (including hardlink checks), it will only be mapped into memory once.
-
-Any configuration options specified here are combined with any defaults
-specified in L</font_config>.
-
-If the font can't be loaded, this throws an exception.  If the named font has
-already been loaded, this will return the existing font, even if the options
-have changed.
-
-=cut
-
-sub load_font {
-	eval 'require OpenGL::Sandbox::V1::FTGLFont'
-		or croak "Font support requires module L<OpenGL::Sandbox::V1::FTGLFont>, and OpenGL 1.x";
-	no warnings 'redefine';
-	*load_font= *_load_font;
-	goto $_[0]->can('load_font');
-}
-sub _load_font {
-	my ($self, $name, %options)= @_;
-	$self->_font_cache->{$name} ||= do {
-		$log->debug("loading font $name");
-		my $name_cfg= $self->font_config->{$name} // {};
-		# Check for alias
-		ref $name_cfg
-			or return $self->load_font($name_cfg);
-		# Merge options, configured options, and configured defaults
-		my $default_cfg= $self->font_config->{'*'} // {};
-		%options= ( filename => $name, %$default_cfg, %$name_cfg, %options );
-		my $font_data= $self->load_fontdata($options{filename});
-		OpenGL::Sandbox::V1::FTGLFont->new(data => $font_data, %options);
-	};
-}
-
-=head2 load_fontdata
-
-  $mmap= $res->load_fontdata( $name );
-
-Memory-map the given font file.  Dies if the font doesn't exist.
-A memory-mapped font file can be shared between all the renderings
-at different resolutions.
-
-=cut
-
-sub load_fontdata {
-	my ($self, $name)= @_;
-	my $mmap;
-	return $mmap if $mmap= $self->_fontdata_cache->{$name};
-	
-	$log->debug("loading fontdata $name");
-	my $info= $self->_font_dir_cache->{$name}
-		or croak "No such font file '$name'";
-	# $info is pair if [$inode_key, $real_path].  Check if inode is already mapped.
-	unless ($mmap= $self->_fontdata_cache->{$info->[0]}) {
-		# If it wasn't, map it and also weaken the reference
-		$mmap= OpenGL::Sandbox::MMap->new($info->[1]);
-		Scalar::Util::weaken( $self->_fontdata_cache->{$info->[0]}= $mmap );
-	}
-	# Then cache that reference for this name, but also a weak reference.
-	# (the font objects will hold strong references to the data)
-	Scalar::Util::weaken( $self->_fontdata_cache->{$name}= $mmap );
-	return $mmap;
-}
-
-=head2 tex
-
-  my $tex= $res->tex( $name );
+  my $tex= $res->tex( $name ); # handy alias
+  my $tex= $res->texture( $name );
 
 Load a texture by name, or return the 'default' texture if it doesn't exist.
+This operates on the assumption that you'd rather see a big visual cue about which texute is
+missing than to have your program crash from an exception.  You still get the exception if
+you don't have a texture named 'default'.
 
 =cut
 
 sub tex {
 	my ($self, $name)= @_;
-	$self->_texture_cache->{$name} ||=
-		( try { $self->load_texture($name) }
-		  catch { chomp(my $err= "Image '$name': $_"); $log->error($err); undef; }
-		)
-		|| $self->_texture_cache->{default}
-		|| $self->load_texture('default');
+	$self->_texture_cache->{$name}
+		|| ( try { $self->load_texture($name) }
+		     catch { chomp(my $err= "Image '$name': $_"); $log->error($err); undef; }
+		   )
+		|| ($name ne 'default' && try { $self->tex('default') } )
+		|| croak("No texture '$name' and no 'default'");
 }
 
 =head2 load_texture
@@ -344,151 +291,177 @@ sub load_texture {
 	return $tex if $tex= $self->_texture_cache->{$name};
 	
 	$log->debug("loading texture $name");
-
-	my $name_cfg= $self->tex_config->{$name} // {};
-	# Check for alias
-	ref $name_cfg
-		or return $self->load_texture($name_cfg);
-
-	# Merge options, configured options, and configured defaults
-	my $default_cfg= $self->tex_config->{'*'} // {};
-	%options= ( filename => $name, %$default_cfg, %$name_cfg, %options );
-	
-	my $info= $self->_texture_dir_cache->{$options{filename}}
-		or croak "No such texture '$options{filename}'";
-	$tex= OpenGL::Sandbox::Texture->new(%options, filename => $info->[1]);
-	$self->_texture_cache->{$name}= $tex;
-	return $tex;
+	my ($real_name, $ctor_args)= _interpret_config($self->tex_config, $name, \%options);
+	my $filename= $ctor_args->{filename} // $real_name;
+	my $file_info= $self->_texture_dir_cache->{$filename}
+		or croak "No such texture '$filename'";
+	$ctor_args->{filename}= $file_info->[1];
+	$self->_texture_cache->{$name}= $self->_texture_cache->{$real_name}
+		//= OpenGL::Sandbox::Texture->new($ctor_args);
 }
 
-=head2 buffer
+=head2 buffer, new_buffer
 
   my $buffer= $res->buffer( $name );
-
-Return an existing or configured buffer object.  If the name is unknown, this dies.
-Use L</new_buffer> to create a new named buffer object.
-
-Buffer objects require OpenGL version 2.0 or above.
-
-=head2 new_buffer
-
   my $buffer= $res->new_buffer( $name, %options );
 
-This creates a new buffer object using the given key/value pairs of C<%options>.  If there was
-a configuration for this named buffer, the options will be merged into it.  This dies if
-L<$name> already exists.
-
+Get a Buffer Object, either configured in L<buffer_config> or loaded from L<data_path>.
 Buffer objects require OpenGL version 2.0 or above.
+
+=over
+
+=item buffer
+
+Return an existing buffer object, or create one from L</buffer_config>.  If the C<$name> is
+not configured, this dies.
+
+=item new_buffer
+
+This creates a new buffer object by combining C<%options> with any (optional) configuration for
+this name in L</buffer_config>.  This dies if C<$name> was already created.
+
+=back
 
 =cut
 
 sub buffer {
 	my ($self, $name)= @_;
-	$self->_buffer_cache->{$name} || (
-		defined $self->buffer_config->{$name}? $self->new_buffer($name)
-			: $self->load_buffer($name)
-	);
-}
-
-sub load_buffer {
-	my ($self, $name, %options)= @_;
-	require OpenGL::Sandbox::Buffer;
-	croak "Unimplemented: load buffer from disk";
+	$self->_buffer_cache->{$name} //= do {
+		defined $self->buffer_config->{$name} or croak "No configured buffer '$name'";
+		my ($real_name, $ctor_args)= _interpret_config($self->buffer_config, $name, {});
+		$self->_buffer_cache->{$real_name} // $self->new_buffer($real_name, %$ctor_args);
+	}
 }
 
 sub new_buffer {
 	my ($self, $name, %options)= @_;
-	require OpenGL::Sandbox::Buffer;
 	$self->_buffer_cache->{$name} and croak "Buffer '$name' already exists";
-	$self->_buffer_cache->{$name}= OpenGL::Sandbox::Buffer->new(
-		%{ $self->buffer_config->{$name} // {} },
-		%options
-	);
+	my ($real_name, $ctor_args)= _interpret_config($self->buffer_config, $name, \%options);
+	$self->_buffer_cache->{$name}= $self->_buffer_cache->{$real_name} //= do {
+		if (!defined $options{data} && !defined $options{autoload}) {
+			my $filename= $ctor_args->{filename} // $real_name;
+			my $file_info= $self->_data_dir_cache->{$filename};
+			$ctor_args->{filename}= $file_info->[1] if $file_info;
+		}
+		OpenGL::Sandbox::Buffer->new($ctor_args);
+	}
 }
 
-=head2 vertex_array
+=head2 vao, vertex_array, new_vao, new_vertex_array
 
-  my $vertex_array= $res->vertex_array( $name );
+  my $vertex_array= $res->vao( $name );
+  my $vertex_array= $res->new_vao( $name, %options );
 
 Return an existing or configured L<OpenGL::Sandbox::VertexArray|Vertex Array>.
+The configurations may reference Buffer objects by name, and these will be translated
+to the actual perl object with calls to L</buffer> before constructing the vertex array.
+
+=over
+
+=item vao
+
+=item vertex_array
+
+Return an existing VAO, or create one from L</vao_config>.  If the C<$name> is not configured,
+this dies.
+
+=head2 new_vao
 
 =head2 new_vertex_array
 
-  my $vertex_array= $res->new_vertex_array( $name, %options );
+Create a new Vertex Array Object by combining C<%options> with any (optional) configuration
+for this name in L</vao_config>.  This dies if C<$name> was already created.
 
-Create a new L<OpenGL::Sandbox::VertexArray|Vertex Array> from the given arguments, and cache
-it as C<$name>.
+=back
 
 =cut
 
+sub _replace_with_named_buffer {
+	my $self= shift;
+	return unless defined $_[0] && !ref $_[0] && $_[0] !~ /^[0-9]+$/;
+	$_[0]= $self->buffer($_[0]);
+}
+
 sub vertex_array {
 	my ($self, $name)= @_;
-	$self->_vertex_array_cache->{$name} || do {
-		defined $self->vertex_array_config->{$name} or croak "No such Vertex Array '$name'";
-		$self->new_vertex_array($name);
+	$self->_vao_cache->{$name} //= do {
+		defined $self->vao_config->{$name} or croak "No configured Vertex Array '$name'";
+		my ($real_name, $ctor_args)= _interpret_config($self->vao_config, $name, {});
+		$self->_vao_cache->{$real_name} // $self->new_vertex_array($real_name, %$ctor_args);
 	};
 }
+*vao= *vertex_array;
+
 sub new_vertex_array {
 	my ($self, $name, %options)= @_;
-	require OpenGL::Sandbox::VertexArray;
-	$self->_vertex_array_cache->{$name} and croak "Vertex Array '$name' already exists";
-	$self->_vertex_array_cache->{$name}= OpenGL::Sandbox::VertexArray->new(
-		%{ $self->vertex_array_config->{$name} // {} },
-		%options
-	);
+	$self->_vao_cache->{$name} and croak "Vertex Array '$name' already exists";
+	my ($real_name, $ctor_args)= _interpret_config($self->vao_config, $name, \%options);
+	$self->_vao_cache->{$name}= $self->_vao_cache->{$real_name} //= do {
+		# Any references to named buffer objects need replaced with the object.
+		$self->_replace_with_named_buffer($_)
+			for $ctor_args->{buffer}, map $_->{buffer}, @{ $ctor_args->{attributes} // [] };
+		OpenGL::Sandbox::VertexArray->new($ctor_args);
+	}
 }
+*new_vao= *new_vertex_array;
 
-=head2 shader
+=head2 shader, new_shader
 
   my $shader= $res->shader( $name );
-  my $shader= $res->load_shader( $name, %options );
+  my $shader= $res->new_shader( $name, %options );
 
 Returns a named shader.  A C<$name> ending with C<.frag> or C<.vert> will imply the relevant
 GL shader type, unless you specifically passed it in C<%options> or configured it in
-L</shader_config>.  Every call after the first uses the cached shader object, and C<%options>
-are ignored.
+L</shader_config>.
 
 Shader and Program objects require OpenGL version 2.0 or above.
+
+=over
+
+=item shader
+
+Return an existing or configured shader.
+
+=item new_shader
+
+Create a new named shader from the options, including any configuration in L</shader_config>.
+The shader must not have previously been created.
+
+=back
 
 =cut
 
 sub shader {
-	# Loading Shader might die on old OpenGL, so use a trampoline before accessing for first time.
-	require OpenGL::Sandbox::Shader;
-	no warnings 'redefine';
-	*shader= *_load_shader;
-	*load_shader= *_load_shader;
-	shift->_load_shader(@_);
-}
-*load_shader= *shader;
-sub _load_shader {
-	my ($self, $name, %options)= @_;
-	return $self->_shader_cache->{$name} //= do {
-		$log->debug("loading shader $name");
-		my $name_cfg= $self->shader_config->{$name} // {};
-		# Check for alias
-		!ref $name_cfg? $self->_load_shader($name_cfg)
-		: do {
-			# Merge options, configured options, and configured defaults
-			my $default_cfg= $self->shader_config->{'*'} // {};
-			%options= ( filename => $name, %$default_cfg, %$name_cfg, %options );
-			my $info= $self->_shader_dir_cache->{$options{filename}}
-				or croak "No such shader '$options{filename}'";
-			OpenGL::Sandbox::Shader->new(%options, filename => $info->[1]);
-		}
-	};
+	my ($self, $name)= @_;
+	$self->_shader_cache->{$name} // $self->new_shader($name);
 }
 
-=head2 program
+sub new_shader {
+	my ($self, $name, %options)= @_;
+	$self->_shader_cache->{$name} and croak "Shader '$name' already exists";
+	my ($real_name, $ctor_args)= _interpret_config($self->shader_config, $name, \%options);
+	$self->_shader_cache->{$name}= $self->_shader_cache->{$real_name} //= do {
+		if (!$ctor_args->{source} && !$ctor_args->{binary}) {
+			my $filename= $ctor_args->{filename} // $real_name;
+			my $file_info= $self->_shader_dir_cache->{$filename}
+				or croak "No such shader source '$filename'";
+			$ctor_args->{filename}= $file_info->[1];
+		}
+		OpenGL::Sandbox::Shader->new($ctor_args);
+	}
+}
+
+=head2 program, new_program
 
   my $prog= $res->program( $name );
+  my $prog= $res->new_program( $name, %options );
 
-Return a named shader program.  The settings come from L</program_config>, but if that
-does not specify C<shaders>, this will look through the C<< shaders/ >> directory for every
+Return a named shader program.  If the combined C<%options> and L</program_config> do
+not specify C<shaders>, this will look through the C<< shader/ >> directory for every
 shader that begins with this name.  For example, if the directory contains:
 
-   shaders/foo.vert
-   shaders/foo.frag
+   shader/foo.vert
+   shader/foo.frag
 
 Then this will augment the configuration with
 
@@ -496,46 +469,131 @@ Then this will augment the configuration with
 
 Shader and Program objects require OpenGL version 2.0 or above.
 
+=over
+
+=item program
+
+Return a configured or existing or implied (by shader names) program object.
+
+=item new_program
+
+Create and return a new named program, with the given constructor options, which get combined
+with any in L</program_config>.
+
 =cut
 
-sub program {
-	require OpenGL::Sandbox::Program;
-	no warnings 'redefine';
-	*program= *_load_program;
-	shift->_load_program(@_);
+sub _shaders_matching_name {
+	my ($self, $name)= @_;
+	# If shaders "foo.frag" and "foo.vert" exist, then this
+	# will generate { frag => "foo.frag", vert => "foo.vert" }
+	map { $_ =~ /^\Q$name\E\.(\w+)$/? ($1 => $_) : () }
+		keys %{ $self->_shader_dir_cache };
 }
-sub _load_program {
-	my ($self, $name, %options)= @_;
-	return $self->_program_cache->{$name} //= do {
-		$log->debug("loading shader program (pipeline) $name");
-		my $name_cfg= $self->program_config->{$name} // {};
-		# Check for alias
-		!ref $name_cfg? $self->_load_program($name_cfg)
-		: do {
-			# Merge options, configured options, and configured defaults
-			my $default_cfg= $self->program_config->{'*'} // {};
-			# Find shaders with same base name as this program, unless they were
-			# specifically given by %options or %$name_cfg
-			my %shaders= $options{shaders}? %{$options{shaders}}
-				: $name_cfg->{shaders}? %{$name_cfg->{shaders}}
-				# If shaders "foo.frag" and "foo.vert" exist, then this
-				# will generate { frag => "foo.frag", vert => "foo.vert" }
-				: map { $_ =~ /^\Q$name\E\.(\w+)$/? ($1 => $_) : () }
-					keys %{ $self->_shader_dir_cache };
-			# But still merge in any of the defaults if they weren't overridden
-			%shaders= (%{$default_cfg->{shaders}}, %shaders)
-				if $default_cfg->{shaders};
-			# Now, translate the shader names into shader objects
-			$_= $self->load_shader($_)
-				for values %shaders;
-			OpenGL::Sandbox::Program->new(
-				%$default_cfg, %$name_cfg, %options, shaders => \%shaders
-			);
+sub program {
+	my ($self, $name)= @_;
+	$self->_program_cache->{$name} //= do {
+		if (!$self->program_config->{$name}) {
+			# If there is no config for this program, then it must have existing shaders
+			# that match it, else we assume it was a typo.
+			$self->_shaders_matching_name($name)
+				or croak "No configured or implied program '$name'";
 		}
+		my ($real_name, $ctor_args)= _interpret_config($self->program_config, $name, {});
+		$self->_program_cache->{$real_name} // $self->new_program($real_name, %$ctor_args);
+	}
+}
+sub new_program {
+	my ($self, $name, %options)= @_;
+	$self->_program_cache->{$name} and croak "Program '$name' already exists";
+	my ($real_name, $ctor_args)= _interpret_config($self->program_config, $name, {});
+	$self->_program_cache->{$name}= $self->_program_cache->{$real_name} //= do {
+		# perform a deeper merge of the ->{shaders} element
+		my $default_cfg= $self->program_config->{'*'};
+		$ctor_args->{shaders}= {
+			$self->_shaders_matching_name($real_name),
+			( $ctor_args->{shaders}? %{ $ctor_args->{shaders} } : () ),
+			( $default_cfg && $default_cfg->{shaders}? %{ $default_cfg->{shaders} } : () ),
+		};
+
+		# Now, translate the shader names into shader objects
+		$_= $self->shader($_)
+			for values %{ $ctor_args->{shaders} };
+		OpenGL::Sandbox::Program->new($ctor_args);
+	}
+}
+
+=head2 font
+
+  $font= $res->font( $name );
+
+Retrieve a named font, either confgured in L<font_config>, previously created, or implied by
+the presence of a file in L</font_path>.
+
+If the font cannot be loaded, this logs a warning and returns the 'default'
+font rather than throwing an exception or returning undef.  If there is no font named
+'default', it dies instead.
+
+=cut
+
+sub font {
+	my ($self, $name)= @_;
+	$self->_font_cache->{$name} ||=
+		( try { $self->load_font($name) }
+		  catch { chomp(my $err= "Font '$name': $_"); $log->error($err); undef; }
+		)
+		|| ($name ne 'default' && try { $self->font('default') } )
+		|| croak "No font '$name' and no 'default'";
+}
+
+=head2 new_font
+
+  $font= $res->load_font( $name, %config );
+
+Load a font by name.  By default, a font file of the same name is loaded as a
+TextureFont and rendered at 24px.  If multiple named fonts reference the same
+file (including hardlink checks), it will only be mapped into memory once.
+
+Any configuration options specified here are combined with any defaults
+specified in L</font_config>.
+
+If the font can't be loaded, this throws an exception.  If the named font has
+already been loaded, this will return the existing font, even if the options
+have changed.
+
+=cut
+
+*load_font= *new_font;
+sub new_font {
+	eval 'require OpenGL::Sandbox::V1::FTGLFont'
+		or croak "Font support requires module L<OpenGL::Sandbox::V1::FTGLFont>, and OpenGL 1.x";
+	no warnings 'redefine';
+	*load_font= *_load_font;
+	goto $_[0]->can('load_font');
+}
+sub _load_font {
+	my ($self, $name, %options)= @_;
+	$self->_font_cache->{$name} //= do {
+		$log->debug("loading font $name");
+		my ($real_name, $ctor_args)= _interpret_config($self->font_config, $name, \%options);
+		$self->_font_cache->{$real_name} //= do {
+			my $filename= $ctor_args->{filename} //= $real_name;
+			my $file_info= $self->_font_dir_cache->{$filename}
+				or croak "No such font source '$filename'";
+			$ctor_args->{data}= $self->_get_cached_mmap($file_info);
+			OpenGL::Sandbox::V1::FTGLFont->new($ctor_args);
+		};
 	};
 }
 
-=head2 
+# Not officially public anymore, so don't document it
+sub load_fontdata {
+	my ($self, $name)= @_;
+	my ($real_name, $ctor_args)= _interpret_config($self->font_config, $name);
+	my $filename= $ctor_args->{filename} //= $real_name;
+	my $file_info= $self->_font_dir_cache->{$filename}
+		or croak "No such font source '$filename'";
+	$self->_get_cached_mmap($file_info);
+}
 
 =head2 clear_cache
 
@@ -547,14 +605,17 @@ allocated.  The next access to any font or texture will re-load the resource fro
 
 sub clear_cache {
 	my $self= shift;
+	%{ $self->_mmap_cache }= ();
 	%{ $self->_texture_cache }= ();
 	$self->_clear_texture_dir_cache;
-	%{ $self->_font_cache }= ();
-	%{ $self->_fontdata_cache }= ();
-	$self->_clear_font_dir_cache;
-	%{ $self->_program_cache }= ();
-	%{ $self->_shader_cache }= ();
+	$self->_clear_buffer_cache;
+	$self->_clear_data_dir_cache;
+	$self->_clear_vao_cache;
+	$self->_clear_shader_cache;
 	$self->_clear_shader_dir_cache;
+	$self->_clear_program_cache;
+	$self->_clear_font_cache;
+	$self->_clear_font_dir_cache;
 }
 
 sub _cache_directory {
@@ -592,7 +653,7 @@ sub _cache_directory {
 		else {
 			$log->warn("Can't stat $full_path: $!");
 		}
-	}}, $path);
+	}}, $path) if -d $path;
 	\%names;
 }
 

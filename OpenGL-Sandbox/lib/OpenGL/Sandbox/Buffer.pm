@@ -49,6 +49,12 @@ True if the id attribute is allocated.
 
 =back
 
+=head2 autoload
+
+If this field is defined at the time of the next call to L</bind>, this data will be
+immediately be loaded into the buffer with glBufferData.  The field will then be cleared, to
+avoid holding onto large blobs of data.
+
 =cut
 
 has target     => ( is => 'rw' );
@@ -56,7 +62,23 @@ has usage      => ( is => 'rw' );
 has id         => ( is => 'lazy', predicate => 1 );
 sub _build_id { gen_buffers(1) }
 
+has autoload   => ( is => 'rw' );
+
 =head1 METHODS
+
+=head2 new
+
+This is a standard Moo constructor, accepting any of the attributes, however it also accepts
+an alias C<'data'> for the L</autoload> attribute.
+
+=cut
+
+sub BUILD {
+	my ($self, $args)= @_;
+	if ($args->{data} && !defined $self->autoload) {
+		$self->autoload($args->{data});
+	}
+}
 
 =head2 bind
 
@@ -73,7 +95,12 @@ sub bind {
 	my ($self, $target)= @_;
 	$self->target($target) if defined $target;
 	$target //= $self->target // croak "No target specified, and target attribute is not set";
-	glBindBuffer($target, $self->id);
+	if (defined $self->autoload) {
+		$self->load($self->autoload);
+		$self->autoload(undef);
+	} else {
+		glBindBuffer($target, $self->id);
+	}
 	$self;
 }
 

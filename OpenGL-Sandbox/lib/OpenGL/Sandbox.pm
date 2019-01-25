@@ -36,7 +36,7 @@ BEGIN {
 require constant;
 
 export qw( =$res -resources(1) tex new_texture buffer new_buffer shader new_shader
-	program new_program font
+	program new_program font vao new_vao
 	make_context current_context next_frame
 	gl_error_name get_gl_errors log_gl_errors warn_gl_errors
 	gen_textures delete_textures round_up_pow2
@@ -210,6 +210,8 @@ sub tex         { OpenGL::Sandbox::ResMan->default_instance->tex(@_) }
 sub new_texture { OpenGL::Sandbox::ResMan->default_instance->new_texture(@_) }
 sub buffer      { OpenGL::Sandbox::ResMan->default_instance->buffer(@_) }
 sub new_buffer  { OpenGL::Sandbox::ResMan->default_instance->new_buffer(@_) }
+sub vao         { OpenGL::Sandbox::ResMan->default_instance->vao(@_) }
+sub new_vao     { OpenGL::Sandbox::ResMan->default_instance->new_vao(@_) }
 sub shader      { OpenGL::Sandbox::ResMan->default_instance->shader(@_) }
 sub new_shader  { OpenGL::Sandbox::ResMan->default_instance->new_shader(@_) }
 sub program     { OpenGL::Sandbox::ResMan->default_instance->program(@_) }
