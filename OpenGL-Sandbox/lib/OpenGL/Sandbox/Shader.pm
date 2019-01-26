@@ -128,9 +128,13 @@ sub prepare {
 
 sub _build_id {
 	my $self= shift;
+	my $fname= $self->filename // '';
+	my $source= $self->source // '';
 	my $type= defined $self->type? $self->type
-		: $self->filename =~ /\.frag$/i? GL_FRAGMENT_SHADER
-		: $self->filename =~ /\.vert$/i? GL_VERTEX_SHADER
+		: $fname =~ /\.frag$/i? GL_FRAGMENT_SHADER
+		: $fname =~ /\.vert$/i? GL_VERTEX_SHADER
+		: $source =~ /gl_Position\s*=/? GL_VERTEX_SHADER
+		: $source =~ /gl_FragColor\s*=/? GL_FRAGMENT_SHADER
 		: croak "No shader type specified, and don't recognize file extension";
 	my $id= glCreateShader($type);
 	warn_gl_errors and croak "glCreateShader failed";

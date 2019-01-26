@@ -60,8 +60,8 @@ You can override these implied sub-paths with the following attributes:
 
 =back
 
-A plain string is interpreted as relative to C</path>; an absolute path or path beginning
-with C<"."> is used as-is.
+A plain string is interpreted as relative to C<path>; an absolute path or path beginning
+with C<"."> is used as-is.  An empty string means it is identical to C<path>.
 
 =head2 font_config
 
@@ -132,6 +132,7 @@ has path              => ( is => 'rw', default => sub {'.'}, trigger => sub {
 	$_[0]->_clear_texture_dir_cache;
 	$_[0]->_clear_shader_dir_cache;
 	$_[0]->_clear_font_dir_cache;
+	$_[0]->_clear_data_dir_cache;
 });
 *resource_root_dir= *path; # back-compat name
 
@@ -210,6 +211,7 @@ sub _build__font_cache {
 
 sub _interpret_path {
 	my ($self, $spec)= @_;
+	return $self->path unless defined $spec && length $spec;
 	return $spec if file_name_is_absolute($spec) or (splitdir($spec))[0] eq '.';
 	return catdir($self->path, $spec);
 }
@@ -525,7 +527,7 @@ sub new_program {
 		};
 
 		# Now, translate the shader names into shader objects
-		$_= $self->shader($_)
+		ref $_ or ($_= $self->shader($_))
 			for values %{ $ctor_args->{shaders} };
 		OpenGL::Sandbox::Program->new($ctor_args);
 	}

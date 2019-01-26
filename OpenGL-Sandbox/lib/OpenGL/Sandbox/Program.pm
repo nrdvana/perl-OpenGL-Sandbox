@@ -192,12 +192,13 @@ sub uniform_location {
 	($self->uniforms->{$name} // [])->[1];
 }
 
-
 sub set_uniform {
 	my $self= shift;
 	OpenGL::Sandbox::set_uniform($self->id, $self->uniforms, @_);
 	$self;
 }
+*set= *set_uniform;
+*uniform= *set_uniform;
 
 sub DESTROY {
 	my $self= shift;
