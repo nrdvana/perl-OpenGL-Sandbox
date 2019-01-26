@@ -35,7 +35,7 @@ program composed of a vertex shader and fragment shader, and attaching one of th
 a global change.  In newer OpenGL, you may assemble multiple program pipelines and switch
 between them.
 
-This class tries to support both APIs, by holding a set of shaders which you can then "activate".
+This class tries to support both APIs, by holding a set of shaders which you can then "bind".
 On newer OpenGL, this calls C<glUseProgram>.  On older OpenGL, this changes the global vertex
 and fragment shaders to the ones referenced by this object.
 
@@ -66,7 +66,7 @@ OpenGL.
 
 =head2 shaders
 
-A hashref of shaders, each of which will be attached to the program when it is activated.
+A hashref of shaders, each of which will be attached to the program when it is bound.
 The keys of the hashref are up to you, and simply to help diagnostics or merging shader
 configurations together with defaults.
 
@@ -103,9 +103,9 @@ has _attribute_cache => ( is => 'rw', default => sub { +{} } );
 
 =head1 METHODS
 
-=head2 activate
+=head2 bind
 
-  $program->activate;
+  $program->bind;
 
 Begin using this program as the active GL pipeline.
 
@@ -113,7 +113,7 @@ Returns C<$self> for convenient chaining.
 
 =cut
 
-sub activate {
+sub bind {
 	my $self= shift;
 	$self->prepare unless $self->prepared;
 	glUseProgram($self->id);

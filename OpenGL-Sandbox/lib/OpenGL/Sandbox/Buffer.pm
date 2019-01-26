@@ -97,6 +97,7 @@ sub BUILD {
   $buffer->bind(GL_ARRAY_BUFFER);
 
 Bind this buffer to a target, using L</target> as the default.
+If L<autoload> is set, this will also load that data into the buffer.
 
 Returns C<$self> for convenient chaining.
 

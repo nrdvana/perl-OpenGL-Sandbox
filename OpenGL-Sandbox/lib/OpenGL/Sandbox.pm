@@ -72,20 +72,18 @@ export qw( =$res -resources(1) tex new_texture buffer new_buffer shader new_shad
     },
     vertex_array_config => {
       unit_quad => {
-        buffer => {
-          data => pack('f*', # two triangles covering entire screen
+        buffer => { data => pack('f*', # two triangles covering entire screen
             -1.0, -1.0,   1.0, -1.0,    -1.0,  1.0,
              1.0, -1.0,   1.0,  1.0,    -1.0,  1.0
-          )
-        },
+        )},
         attributes => { pos => { size => 2, type => GL_FLOAT } }
       },
     },
   };
   make_context;
-  new_program('demo', shaders => { frag => $ARGV[0] })->activate;
-  program('demo')->set_uniform("iResolution", 640, 480, 1.0);
-  vao('unit_quad')->apply;
+  new_program('demo', shaders => { frag => $ARGV[0] })->bind
+    ->set_uniform("iResolution", 640, 480, 1.0);
+  vao('unit_quad')->bind;
   my $started= time;
   while (1) {
     program('demo')->set_uniform("iGlobalTime", time - $started);

@@ -33,10 +33,10 @@ The newer versions can cache the configuration in an Object, and the newest vers
 can set it up without mucking around with global state.
 
 This object attempts to represent the configuration in a version-neutral manner.  There are two
-phases: L</prepare> and L</apply>.  On old OpenGL, C<prepare> does nothing, since there is
-no way to cache the results, and C<apply> does all the work.  On new OpenGL (3.0 and up) the
-C<prepare> step creates a cached VertexArray, and C<apply> binds it.  All you need to do is
-call C<apply> and it will C<prepare> if needed.
+phases: L</prepare> and L</bind>.  On old OpenGL, C<prepare> does nothing, since there is
+no way to cache the results, and C<bind> does all the work.  On new OpenGL (3.0 and up) the
+C<prepare> step creates a cached VertexArray, and C<bind> binds it.  All you need to do is
+call C<bind> and it will C<prepare> if needed.
 
 =head1 ATTRIBUTES
 
@@ -65,7 +65,7 @@ For OpenGL 3.0+, this will be allocated upon demand.  For earlier OpenGL, this r
 
 =head2 buffer
 
-You can specify a buffer on each attribute, or specify it in the call to C<apply>, or you can
+You can specify a buffer on each attribute, or specify it in the call to C<bind>, or you can
 supply a default buffer here that will be used for all the attributes.  If given a hashref,
 it will be inflated to a buffer object.  If you give an integer, it will be used directly.
 
@@ -110,9 +110,9 @@ sub _choose_implementation {
 
 =head1 METHODS
 
-=head2 apply
+=head2 bind
 
-  $vertex_array->apply($program, $buffer);
+  $vertex_array->bind($program, $buffer);
 
 Make the configuration of this vertex array active for drawing.  This might cause a cascade of
 effects, like binding buffers, loading buffers, binding the vertex array object, looking up
@@ -125,9 +125,9 @@ attribute configuration specifies otherwise).
 
 =cut
 
-sub apply {
+sub bind {
 	$_[0]->_choose_implementation;
-	shift->apply(@_);
+	shift->bind(@_);
 }
 
 sub prepare {
@@ -148,7 +148,7 @@ sub _bind_buffer_unless_current {
 	}
 }
 
-sub OpenGL::Sandbox::VertexArray::V2::apply {
+sub OpenGL::Sandbox::VertexArray::V2::bind {
 	my ($self, $program, $default_buffer)= @_;
 	$program //= OpenGL::Sandbox::_gl_get_integer(GL_CURRENT_PROGRAM);
 	my $cur_buffer= OpenGL::Sandbox::_gl_get_integer(GL_ARRAY_BUFFER_BINDING);
@@ -171,7 +171,7 @@ sub OpenGL::Sandbox::VertexArray::V2::apply {
 
 sub OpenGL::Sandbox::VertexArray::V2::prepare {}
 
-sub OpenGL::Sandbox::VertexArray::V3::apply {
+sub OpenGL::Sandbox::VertexArray::V3::bind {
 	my ($self, $program, $default_buffer)= @_;
 	$self->prepared? glBindVertexArray($self->id) : $self->prepare($program, $default_buffer);
 }
@@ -180,11 +180,11 @@ sub OpenGL::Sandbox::VertexArray::V3::prepare {
 	my ($self, $program, $default_buffer)= @_;
 	my $vao_id= $self->id || croak("Can't allocate Vertex Array Object ID?");
 	glBindVertexArray($vao_id);
-	OpenGL::Sandbox::VertexArray::V2::apply(@_);
+	OpenGL::Sandbox::VertexArray::V2::bind(@_);
 	$self->prepared(1);
 }
 
-sub OpenGL::Sandbox::VertexArray::V4_3::apply {
+sub OpenGL::Sandbox::VertexArray::V4_3::bind {
 	my ($self, $program, $default_buffer)= @_;
 	$self->prepared? glBindVertexArray($self->id) : $self->prepare($program, $default_buffer);
 }

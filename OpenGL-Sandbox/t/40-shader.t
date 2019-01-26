@@ -53,7 +53,7 @@ sub test_shader_program {
 	is( OpenGL::Sandbox::get_glsl_type_name($prog->uniforms->{mat}[2]), 'mat4', 'uniform glsl type name' );
 	
 	my @mat= ( 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15);
-	$prog->activate;
+	$prog->bind;
 	ok( eval{ $prog->set_uniform('mat', @mat); }, 'set_uniform values' ) or diag $@;
 	ok( eval{ $prog->set_uniform('mat', \@mat); }, 'set_uniform arrayref' ) or diag $@;
 	ok( eval{ $prog->set_uniform('mat', [ [0,1,2,3], [4,5,6,7], [8,9,10,11], [12,13,14,15] ]); }, 'set_uniform array-of-array' ) or diag $@;
