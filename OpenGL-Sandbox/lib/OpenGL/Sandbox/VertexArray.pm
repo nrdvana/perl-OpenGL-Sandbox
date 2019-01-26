@@ -16,7 +16,7 @@ use OpenGL::Sandbox::Buffer;
 # ABSTRACT: Object that encapsulates the mapping from buffer to vertex shader
 # VERSION
 
-=head DESCRIPTION
+=head1 DESCRIPTION
 
 Vertex Arrays can be hard to grasp, since their implementation has changed in each major
 version of OpenGL, but I found a very nice write-up in the accepted answer of:
@@ -40,6 +40,10 @@ call C<bind> and it will C<prepare> if needed.
 
 =head1 ATTRIBUTES
 
+=head2 name
+
+Human-readable name of this Vertex Array (not GL's integer "name")
+
 =head2 attributes
 
 This is a hashref of the metadata for each attribute.  You can specify it without knowing the
@@ -59,10 +63,6 @@ Each attribute is a hashref of:
     pointer    => $ofs,    # byte offset into $buffer of first element, defaults to 0
   }
     
-=head2 id
-
-For OpenGL 3.0+, this will be allocated upon demand.  For earlier OpenGL, this remains undef.
-
 =head2 buffer
 
 You can specify a buffer on each attribute, or specify it in the call to C<bind>, or you can
@@ -79,6 +79,22 @@ This is most useful for the following:
       texcoord => { size => 2, type => GL_FLOAT, stride => 32 },
     }
   });
+
+=head2 id
+
+For OpenGL 3.0+, this will be allocated upon demand.  For earlier OpenGL, this remains undef.
+
+=over
+
+=item has_id
+
+Whether the ID (or lack of one) has been resolved yet.
+
+=back
+
+=head2 prepared
+
+Whether the L</prepare> step has happened.
 
 =cut
 
@@ -122,6 +138,11 @@ repeated won't be.
 If C<$program> is not given, the current one will be used for any attribute-index lookups.
 If C<$buffer> is not given, the current GL_VERTEX_ARRAY buffer will be used (unless an
 attribute configuration specifies otherwise).
+
+=head2 prepare
+
+For OpenGL 3+ this creates a VertexArrayObject and initializes it.  For earlier OpenGL, this is
+a no-op.
 
 =cut
 
@@ -169,11 +190,16 @@ sub OpenGL::Sandbox::VertexArray::V2::bind {
 	}
 }
 
-sub OpenGL::Sandbox::VertexArray::V2::prepare {}
+sub OpenGL::Sandbox::VertexArray::V2::prepare {
+	my $self= shift;
+	$self->prepared(1);
+	$self;
+}
 
 sub OpenGL::Sandbox::VertexArray::V3::bind {
 	my ($self, $program, $default_buffer)= @_;
 	$self->prepared? glBindVertexArray($self->id) : $self->prepare($program, $default_buffer);
+	$self;
 }
 
 sub OpenGL::Sandbox::VertexArray::V3::prepare {
@@ -182,11 +208,13 @@ sub OpenGL::Sandbox::VertexArray::V3::prepare {
 	glBindVertexArray($vao_id);
 	OpenGL::Sandbox::VertexArray::V2::bind(@_);
 	$self->prepared(1);
+	$self;
 }
 
 sub OpenGL::Sandbox::VertexArray::V4_3::bind {
 	my ($self, $program, $default_buffer)= @_;
 	$self->prepared? glBindVertexArray($self->id) : $self->prepare($program, $default_buffer);
+	$self;
 }
 
 sub OpenGL::Sandbox::VertexArray::V4_3::prepare {
@@ -212,6 +240,7 @@ sub OpenGL::Sandbox::VertexArray::V4_3::prepare {
 		}
 	}
 	$self->prepared(1);
+	$self;
 }
 
 # TODO: for 4.5 and up, can prepare without binding the VAO, and no need to change

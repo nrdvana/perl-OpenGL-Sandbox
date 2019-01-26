@@ -41,8 +41,6 @@ is( $imported_res, $res, 'can import resource manager' )
 # is( $res->font('squada')->data, $res->font('default')->data, 'Empty is default' );
 # is( $res->font('default')->ascender, 28, 'look up ascender' );
 
-is( $res->tex_default_fmt, 'bgr', 'default pixel format' );
-
 isa_ok( $res->tex('default'), 'OpenGL::Sandbox::Texture', 'load default tex' );
 is( $res->tex('8x8'), $res->tex('default'), '8x8 is default' );
 $res->tex('8x8')->load;

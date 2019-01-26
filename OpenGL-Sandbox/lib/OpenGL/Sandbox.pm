@@ -39,7 +39,7 @@ export qw( =$res -resources(1) tex new_texture buffer new_buffer shader new_shad
 	program new_program font vao new_vao
 	make_context current_context next_frame
 	gl_error_name get_gl_errors log_gl_errors warn_gl_errors
-	gen_textures delete_textures round_up_pow2
+	gen_textures delete_textures _round_up_pow2
 	),
 	-V1 => sub { Module::Runtime::use_module('OpenGL::Sandbox::V1','0.04'); },
 	# Conditionally export the stuff that gets conditionally compiled
@@ -114,7 +114,9 @@ A class providing fonts, but only for OpenGL 1.x
 
 =back
 
-=head1 SPECIAL EXPORTS
+=head1 EXPORTS
+
+Nothing is exported by default.  You may request any of the following:
 
 =head2 GL_$CONSTANT, gl$Function
 
@@ -190,43 +192,38 @@ sub exporter_autoload_symbol {
 	return $self->next::method($sym);
 }
 
-=head1 EXPORTED FUNCTIONS
+=head2 Methods of C<$res>:
 
-=head2 tex
+Shortcuts are exportable for the following methods of the default
+L<resource manager|OpenGL::Sandbox::ResMan>:
 
-Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->tex >>
+=over
 
-=head2 new_texture
+=item tex
 
-Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->new_texture >>
+=item new_texture
 
-=head2 buffer
+=item buffer
 
-Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->buffer >>
+=item new_buffer
 
-=head2 new_buffer
+=item vao
 
-Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->new_buffer >>
+=item new_vao
 
-=head2 shader
+=item shader
 
-Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->shader >>
+=item new_shader
 
-=head2 new_shader
+=item program
 
-Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->new_shader >>
+=item new_program
 
-=head2 program
+=item font
 
-Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->program >>
+=back
 
-=head2 new_program
-
-Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->new_program >>
-
-=head2 font
-
-Shortcut for C<< OpenGL::Sandbox::ResMan->default_instance->font >>
+(i.e. vao("Foo") is the same as C<< OpenGL::Sandbox::ResMan->default_instance->vao("Foo") >>)
 
 Note that you need to install L<OpenGL::Sandbox::V1::FTGLFont> in order to get font support,
 currently.  Other font providers might be added later.
@@ -443,29 +440,29 @@ use OpenGL::Sandbox::Inline
 	LIBS => '-lGL -lswscale',
 	CCFLAGSEX => '-Wall -g3 -Os';
 
-=head2 gen_textures
+=head2 Wrappers Around glGen*
 
-  my @texture_ids= gen_textures($count);
+OpenGL::Modern doesn't currently provide nice wrappers for glGen family of functions, so
+I wrote some of my own.  They follow the pattern
 
-Wrapper around glGenTextures, since implementation varies between OpenGL and OpenGL::Modern
-
-=head2 delete_textures
-
+  my @ids= gen_textures($count);
   delete_textures(@ids);
 
-Wrapper around glDeleteTextures, since implementation varies between OpenGL and OpenGL::Modern
+=over
 
-=head2 gen_buffers
+=item gen_textures
 
-  my @buffer_ids= gen_buffers($count);
+=item delete_textures
 
-Wrapper around glGenBuffers, since implementation varies between OpenGL and OpenGL::Modern
+=item gen_buffers
 
-=head2 delete_buffers
+=item delete_buffers
 
-  delete_buffers(@ids);
+=item gen_vertex_arrays
 
-Wrapper around glDeleteBuffers, since implementation varies between OpenGL and OpenGL::Modern
+=item delete_vertex_arrays
+
+=back
 
 =head2 load_buffer_data
 
@@ -481,6 +478,35 @@ C<$data>.  C<$usage> may also be undef, in which case it will default to C<GL_ST
 Wrapper around glBufferSubData.  C<$size> may be undef, in which case it uses the length of
 C<$data>.  C<$data_offset> is an optional offset from the start of C<$data> to avoid the
 need for substring operations on the perl side.
+
+=head2 get_glsl_type_name
+
+  my $typename= get_glsl_type_name(GL_FLOAT_MAT3);
+  # returns 'mat3'
+
+Returns the GLSL type name that would be used to declare a type, per GL's type constants.
+
+=head2 get_program_uniforms
+
+  my $uniform_set= get_program_uniforms($prog_id);
+
+Returns a hashref of all uniforms defined for a program.  The values are arrayrefs of
+
+  [ $name, $index, $type, $size ]
+
+This cache can be passed to L</set_uniform> to avoid further lookups.
+
+=head2 set_uniform
+
+  set_uniform($program, $cache, $name, @values);
+  set_uniform($program, $cache, $name, \@values);
+  set_uniform($program, $cache, $name, \@val1, \@val2, ...);
+  set_uniform($program, $cache, $name, \OpenGL::Array);
+
+Set a named uniform of a program.  For OpenGL < 4.1 the program must be the active program.
+C<$cache> is the value returned by L</get_program_uniforms>.  C<$value> can be a wide variety
+of things, but in general, must have a number of components that matches the size of the
+uniform being assigned; the values will be automatically packed into a buffer.
 
 =cut
 

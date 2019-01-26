@@ -13,6 +13,10 @@ use OpenGL::Sandbox::MMap;
 
 =head1 ATTRIBUTES
 
+=head2 name
+
+Human-readable name of this texture (not GL's integer "name")
+
 =head2 filename
 
 Path from which image data will be loaded.  If not set, the texture will not have any default
@@ -259,7 +263,7 @@ sub _load_png_data_and_rescale {
 		or croak sprintf "$fname does not contain the expected number of data bytes (%d != %d * %d * %d)",
 			length($$dataref), $has_alpha? 4:3, $width, $height;
 	# Result is a ref to a scalar, to avoid copying
-	unless ($width == $height && $width == OpenGL::Sandbox::round_up_pow2($width)) {
+	unless ($width == $height && $width == OpenGL::Sandbox::_round_up_pow2($width)) {
 		$dataref= OpenGL::Sandbox::_img_rescale_to_pow2_square($width, $height, $has_alpha, $use_bgr? 1 : 0, $dataref);
 	}
 	elsif ($use_bgr) {

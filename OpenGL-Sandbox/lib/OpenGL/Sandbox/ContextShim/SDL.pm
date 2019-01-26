@@ -59,28 +59,27 @@ sub swap_buffers {
 =head1 DESCRIPTION
 
 This class is loaded automatically if needed by L<OpenGL::Sandbox/make_context>.
+It uses L<SDLx::App> to create an OpenGL context.
 
-It provides the standard ContextShim API:
+=head1 ATTRIBUTES
+
+=head2 sdl
+
+The SDLx::App object
+
+=head1 METHODS
+
+=head2 Standard ContextShim API:
 
 =over 14
 
 =item new
 
-Accepting all the options of make_context
+Accepting all the options of L<OpenGL::Sandbox/make_context>
 
 =item context_info
 
 =item swap_buffers
-
-=back
-
-It also provides:
-
-=over 14
-
-=item sdl
-
-The SDL::App object
 
 =back
 

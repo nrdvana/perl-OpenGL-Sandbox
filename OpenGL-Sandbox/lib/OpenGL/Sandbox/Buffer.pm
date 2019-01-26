@@ -25,6 +25,10 @@ Loading this module requires OpenGL 2.0 or higher.
 
 =head1 ATTRIBUTES
 
+=head2 name
+
+Human-readable name of object (not GL's integer "name")
+
 =head2 target
 
 OpenGL buffer target which this buffer object should be bound to, when necessary.

@@ -39,6 +39,10 @@ an exception as soon as you try to use the shaders.
 
 =head1 ATTRIBUTES
 
+=head2 name
+
+Human-readable name of this shader (not GL's integer "name")
+
 =head2 filename
 
 Path from which shader code will be loaded.  If not set, the shader will not load anything
@@ -63,7 +67,7 @@ gets loaded on creation of the L<shader_id>.
 
 Gets executed as C<< $shader->$loader($filename) >>.
 
-=head2 loaded
+=head2 prepared
 
 Boolean; whether the shader is loaded and compiled, via this API.
 (it won't know about changes you make via your own OpenGL calls)

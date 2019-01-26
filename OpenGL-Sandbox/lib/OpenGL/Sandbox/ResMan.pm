@@ -48,9 +48,13 @@ The path where resources are located, adhering to the basic layout of:
 
 You can override these implied sub-paths with the following attributes:
 
-=over
+=over 18
+
+=item texture_path
 
 =item tex_path
+
+(alias for texture_path)
 
 =item shader_path
 
@@ -63,30 +67,28 @@ You can override these implied sub-paths with the following attributes:
 A plain string is interpreted as relative to C<path>; an absolute path or path beginning
 with C<"."> is used as-is.  An empty string means it is identical to C<path>.
 
-=head2 font_config
+=head2 C<*_config>
 
-A hashref of font names which holds default L<OpenGL::Sandbox::Font|font> constructor
-options.  The hash key of C<'*'> can be used to apply default values to every font.
-The font named 'default' can be configured here instead of needing a file of that name in
-the C<font/> directory.
+Each type of resource managed by this object can be pre-configured.  Each config attribute
+is a hashref where the keys match the named of the created resources.  Each config may also
+include a key C<'*'> which applies settings to every created resource.
 
-Example font_config:
+The values of the config are usually hashrefs of constructor arguments that get shallow-merged
+with arguments you pass to C<new_*>, but may also be plain scalars indicating that this resource
+is an alias for some other name.
 
-  {
-    '*'     => { face_size => 48 }, # default settings get applied to all configs
-    3d      => { face_size => 64, type => 'FTExtrudeFont' },
-    default => { face_size => 32, filename => 'myfont1' }, # font named 'default'
-    myfont2 => 'myfont1',  # alias
-  }
+Several configurations also expect an entry for 'default', which gets returned on any request
+for a missing resource.
 
-=head2 tex_config
+The namespace of each type of resource is independent.
 
-A hashref of texture names which holds default L<OpenGL::Sandbox::Texture|texture> constructor
-options.  The hash key of C<'*'> can be used to apply default values to every texture.
-The texture named 'default' can be configured here instead of needing a file of that name in
-the C<tex/> directory.
+=over
 
-Example tex_config:
+=item texture_config
+
+Configuration for L</new_tex>, constructing L<OpenGL::Sandbox::Texture>.
+
+Example texture_config:
 
   {
     '*'     => { wrap_s => GL_CLAMP,  wrap_t => GL_CLAMP  },
@@ -96,17 +98,43 @@ Example tex_config:
     alias1  => 'tile1',
   }
 
-=head2 buffer_config
+Textures can also be implied by a file in the L</tex_path> directory.
 
-A hashref of configuration for named L<OpenGL::Sandbox::Buffer|buffer objects>.
-The hash key of C<'*'> can be used to apply default values to every buffer.
+=item tex_config
 
-=head2 shader_config
+Alias for C<texture_config>
 
-A hashref of shader names which holds default L<OpenGL::Sandbox::Shader|shader> constructor
-options.  The hash key of C<'*'> can be used to apply default values to every shader.
+=item buffer_config
 
-Example shader_config:
+Configuration for L</new_buffer>, constructing L<OpenGL::Sandbox::Buffer>.
+
+  {
+    '*' => { type => GL_VERTEX_ARRAY },
+    triangle_data => { data => pack('f*', 1,1, 2,1, 2,-1, ...) }
+  }
+
+Buffers can also be implied by a file in the L</data_path> directory.
+
+=item vertex_array_config
+
+Configuration for L</new_vertex_array>, constructing L<OpenGL::Sandbox::VertexArray>.
+
+  {
+    my_triangles => {
+      buffer => 'triangle_data',
+      attributes => { pos => { size => 2, type => GL_FLOAT } }
+    }
+  }
+
+Vertex Arrays must be configured; there is currently not a file format for them.
+
+=item vao_config
+
+Alias for C<vertex_array_config>
+
+=item shader_config
+
+Configuration for L</new_shader>, constructing L<OpenGL::Sandbox::Shader>.
 
   {
     '*' => { type => GL_FRAGMENT_SHADER },
@@ -114,21 +142,43 @@ Example shader_config:
     vpassthrough => { filename => 'vertex-passthrough.vert', type => GL_VERTEX_SHADER },
   }
 
-=head2 program_config
+Shaders are also implied by the presence of a file in the L</shader_path> directory.
 
-A hashref of program (pipeline) names which holds default L<OpenGL::Sandbox::Program|program>
-constructor options.  The hash key of C<'*'> can be used to apply default values to every program.
+=item program_config
 
-Example program_config
+Configuration for L</new_program>, constructing L<OpenGL::Sandbox::Program>.
 
   {
     '*' => { shaders => { vertex => 'vpassthrough', fragment => 'aurora' } },
     'demo' => { attr => { ... }, shaders => { vertex => 'special_vshader' } },
   }
 
+Programs are also implied by the presence shaders of the same name prefix.
+
+=item font_config
+
+Configures L<OpenGL::Sandbox::V1::FTGLFont>.  (distributed separately)
+
+  {
+    '*'     => { face_size => 48 }, # default settings get applied to all configs
+    3d      => { face_size => 64, type => 'FTExtrudeFont' },
+    default => { face_size => 32, filename => 'myfont1' }, # font named 'default'
+    myfont2 => 'myfont1',  # alias
+  }
+
+Fonts are also implied by the presence of a file in the L</font_path> directory.
+
+=back
+
+=head2 tex_fmt_priority
+
+If you have texture files with the same base name and different extensions (such as original
+image formats and derived ".png" or ".rgb") this resolves which image file you want to load
+automatically for C<tex("basename")>.  Default is to load ".bgr", else ".rgb", else ".png"
+
 =cut
 
-has path              => ( is => 'rw', default => sub {'.'}, trigger => sub {
+has path              => ( is => 'rw', required => 1, trigger => sub {
 	$_[0]->_clear_texture_dir_cache;
 	$_[0]->_clear_shader_dir_cache;
 	$_[0]->_clear_font_dir_cache;
@@ -136,14 +186,15 @@ has path              => ( is => 'rw', default => sub {'.'}, trigger => sub {
 });
 *resource_root_dir= *path; # back-compat name
 
-has tex_path          => ( is => 'rw', default => sub {'tex'},    trigger => sub { shift->_clear_texture_dir_cache } );
+has texture_path      => ( is => 'rw', default => sub {'tex'},    trigger => sub { shift->_clear_texture_dir_cache } );
+*tex_path= *texture_path;
 has tex_fmt_priority  => ( is => 'rw', lazy => 1, builder => 1 );
-has tex_default_fmt   => ( is => 'rw', lazy => 1, builder => 1 );
 has shader_path       => ( is => 'rw', default => sub {'shader'}, trigger => sub { shift->_clear_shader_dir_cache } );
 has font_path         => ( is => 'rw', default => sub {'font'},   trigger => sub { shift->_clear_font_dir_cache } );
 has data_path         => ( is => 'rw', default => sub {'data'},   trigger => sub { shift->_clear_data_dir_cache } );
 
-has tex_config        => ( is => 'rw', default => sub { +{} } );
+has texture_config    => ( is => 'rw', default => sub { +{} } );
+*tex_config= *texture_config;
 has buffer_config     => ( is => 'rw', default => sub { +{} } );
 has vertex_array_config => ( is => 'rw', default => sub { +{} } );
 *vao_config= *vertex_array_config;
@@ -155,17 +206,6 @@ sub _build_tex_fmt_priority {
 	my $self= shift;
 	# TODO: consult OpenGL to find out which format is preferred.
 	return { bgr => 1, rgb => 2, png => 50 };
-}
-
-sub _build_tex_default_fmt {
-	my $self= shift;
-	my $pri= $self->tex_fmt_priority;
-	# Select the lowest value from the keys of the format priority map
-	my $first;
-	for (keys %{$self->tex_fmt_priority}) {
-		$first= $_ if !defined $first || $pri->{$first} > $pri->{$_};
-	}
-	return $first // 'bgr';
 }
 
 sub _interpret_config {
@@ -239,8 +279,7 @@ sub _get_cached_mmap {
 
 =head2 new
 
-Standard Moo constructor.  Also validates the resource directory by loading
-"font/default", which must exist (either a file or symlink)
+Standard Moo constructor.
 
 =head2 default_instance
 
@@ -250,7 +289,7 @@ Return a default instance which uses the current directory as "path".
 
 our $_default_instance;
 sub default_instance {
-	$_default_instance ||= __PACKAGE__->new();
+	$_default_instance ||= __PACKAGE__->new(path => ".");
 }
 END { $_default_instance->clear_cache if $_default_instance }
 
@@ -259,15 +298,46 @@ sub BUILD {
 	$log->debug("OpenGL::Sandbox::ResMan loaded");
 }
 
-=head2 texture
+=head2 texture, tex, load_texture, new_texture
 
   my $tex= $res->tex( $name ); # handy alias
   my $tex= $res->texture( $name );
+  my $tex= $res->load_texture( $name, %options );
 
-Load a texture by name, or return the 'default' texture if it doesn't exist.
+Get a texture object.  Textures can be configured, or implied by presence of image files in
+L</tex_path>, or both.
+
+=over
+
+=item texture
+
+Return named texture, or load one with L</load_texture>.
+
+The C<texture> method has a feature that if you request a non-existent texture, it will
+return the texture named 'default' rather than throwing an exception.
 This operates on the assumption that you'd rather see a big visual cue about which texute is
 missing than to have your program crash from an exception.  You still get the exception if
 you don't have a texture named 'default'.
+
+=item tex
+
+Alias for C<texture>
+
+=item load_texture
+
+Load a texture, or throw an exception if there is no image file by that name.
+
+It first checks for a file of no extension in L</tex_path>, which may
+be an image file, special "rgb" or "bgr" texture file, or symlink/hardlink to another file.
+Failing that, it checks for a file of that name with any file extension, and
+attempts to load them in whatever order they were returned.
+
+=item new_texture
+
+Create a new texture object regardless of whether the filename exists.  If the texture of this
+name was already created, it dies.
+
+=back
 
 =cut
 
@@ -281,32 +351,31 @@ sub tex {
 		|| croak("No texture '$name' and no 'default'");
 }
 
-=head2 load_texture
-
-  my $tex= $res->load_texture( $name )
-
-Load a texture by name.  It first checks for a file of no extension, which may
-be an image file, cached texture file, or symlink/hardlink to another file.
-Failing that, it checks for a file of that name with any file extension, and
-attempts to load them in whatever order they were returned.
-
-Dies if no matching file can be found, or if it wasn't able to process any match.
-
-=cut
-
 sub load_texture {
 	my ($self, $name, %options)= @_;
-	my $tex;
-	return $tex if $tex= $self->_texture_cache->{$name};
-	
-	$log->debug("loading texture $name");
-	my ($real_name, $ctor_args)= _interpret_config($self->tex_config, $name, \%options);
-	my $filename= $ctor_args->{filename} // $real_name;
-	my $file_info= $self->_texture_dir_cache->{$filename}
-		or croak "No such texture '$filename'";
-	$ctor_args->{filename}= $file_info->[1];
-	$self->_texture_cache->{$name}= $self->_texture_cache->{$real_name}
-		//= OpenGL::Sandbox::Texture->new($ctor_args);
+	$self->_texture_cache->{$name} || do {
+		$log->debug("loading texture $name");
+		my ($real_name, $ctor_args)= _interpret_config($self->tex_config, $name, \%options);
+		$self->_texture_cache->{$real_name} //= do {
+			my $filename= $ctor_args->{filename} // $real_name;
+			my $file_info= $self->_texture_dir_cache->{$filename}
+				or croak "No such texture '$filename'";
+			$ctor_args->{filename}= $file_info->[1];
+			OpenGL::Sandbox::Texture->new($ctor_args);
+		};
+	};
+}
+
+sub new_texture {
+	my ($self, $name, %options)= @_;
+	$self->_texture_cache->{$name} and croak "Texture '$name' already exists";
+	my ($real_name, $ctor_args)= _interpret_config($self->texture_config, $name, \%options);
+	$self->_texture_cache->{$name}= $self->_texture_cache->{$real_name} //= do {
+		my $filename= $ctor_args->{filename} // $real_name;
+		my $file_info= $self->_texture_dir_cache->{$filename};
+		$ctor_args->{filename}= $file_info->[1] if $file_info;
+		OpenGL::Sandbox::Texture->new($ctor_args);
+	}
 }
 
 =head2 buffer, new_buffer
@@ -374,9 +443,9 @@ to the actual perl object with calls to L</buffer> before constructing the verte
 Return an existing VAO, or create one from L</vao_config>.  If the C<$name> is not configured,
 this dies.
 
-=head2 new_vao
+=item new_vao
 
-=head2 new_vertex_array
+=item new_vertex_array
 
 Create a new Vertex Array Object by combining C<%options> with any (optional) configuration
 for this name in L</vao_config>.  This dies if C<$name> was already created.
@@ -488,6 +557,8 @@ Return a configured or existing or implied (by shader names) program object.
 
 Create and return a new named program, with the given constructor options, which get combined
 with any in L</program_config>.
+
+=back
 
 =cut
 

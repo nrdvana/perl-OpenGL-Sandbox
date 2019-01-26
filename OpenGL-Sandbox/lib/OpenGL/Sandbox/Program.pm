@@ -41,6 +41,25 @@ and fragment shaders to the ones referenced by this object.
 
 =head1 ATTRIBUTES
 
+=head2 name
+
+Human-readable name of this program (not GL's integer "name")
+
+=head2 prepared
+
+Boolean; whether the program is ready to run.  This is always 'true' for older global-program
+OpenGL.
+
+=head2 shaders
+
+A hashref of shaders, each of which will be attached to the program when it is activated.
+The keys of the hashref are up to you, and simply to help diagnostics or merging shader
+configurations together with defaults.
+
+=head2 shader_list
+
+A convenient accessor for listing out the values of the L</shader> hash.
+
 =head2 id
 
 The OpenGL integer 'name' of this program.  On older OpenGL with the global program, this will
@@ -55,24 +74,21 @@ True if the id attribute has been lazy-loaded already.
 
 =back
 
-=head2 name
+=head2 uniforms
 
-A friendly name for the program (as used by the L<OpenGL::Sandbox::ResMan|Resource Manager>).
+Lazy-built hashref listing all uniforms of the compiled program.
 
-=head2 prepared
+=over
 
-Boolean; whether the program is ready to run.  This is always 'true' for older global-program
-OpenGL.
+=item has_uniforms
 
-=head2 shaders
+Whether this has been lazy-built yet
 
-A hashref of shaders, each of which will be attached to the program when it is bound.
-The keys of the hashref are up to you, and simply to help diagnostics or merging shader
-configurations together with defaults.
+=item clear_uniforms
 
-=head2 shader_list
+Remove the cache, to be rebuilt on next use
 
-A convenient accessor for listing out the values of the L</shader> hash.
+=back
 
 =cut
 
@@ -92,7 +108,7 @@ sub _build_id {
 	$id;
 }
 
-has prepared  => ( is => 'rw' );
+has prepared   => ( is => 'rw' );
 has uniforms   => ( is => 'lazy', predicate => 1, clearer => 1 );
 
 sub _build_uniforms {
@@ -128,6 +144,10 @@ once, and any changes to L</shaders> afterward are ignored.  Use L</unprepare> t
 the compiled state and be able to rearrange the shaders.
 
 Returns C<$self> for convenient chaining.
+
+=head2 unprepare
+
+Release resources allocated by L</prepare>.
 
 =cut
 
@@ -177,6 +197,10 @@ Return the uniform ID of the given name, for the prepared program.
 Set the value of a uniform.  This attempts to guess at the size/geometry of the uniform based
 on the number or type of values given.
 
+=head2 set
+
+Alias for C<set_uniform>.
+
 =cut
 
 sub attr_by_name {
@@ -198,7 +222,6 @@ sub set_uniform {
 	$self;
 }
 *set= *set_uniform;
-*uniform= *set_uniform;
 
 sub DESTROY {
 	my $self= shift;

@@ -31,7 +31,7 @@ my $vbo= new_ok( 'OpenGL::Sandbox::Buffer', [
 	data => pack('f*', (0)x100)
 ] );
 
-my $program= program('xy_screen')->activate;
-ok( eval { $vao->apply($program, $vbo); 1 }, 'apply' ) or diag $@;
+my $program= program('xy_screen')->bind;
+ok( eval { $vao->bind($program, $vbo); 1 }, 'apply' ) or diag $@;
 
 done_testing;

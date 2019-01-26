@@ -226,7 +226,7 @@ void _texture_load_rgb_square(HV *self, SV *mmap, int is_bgr) {
 	return;
 }
 
-int round_up_pow2(long dim) {
+int _round_up_pow2(long dim) {
 	--dim;
 	dim |= dim >> 32;
 	dim |= dim >> 16;
@@ -243,7 +243,7 @@ SV* _img_rescale_to_pow2_square(int width, int height, int has_alpha, int want_b
 	void *data= SCALAR_REF_DATA(sref);
 	int len= SCALAR_REF_LEN(sref);
 	int px_size= has_alpha? 4 : 3;
-	int dim= round_up_pow2(width > height? width : height);
+	int dim= _round_up_pow2(width > height? width : height);
 	const uint8_t *src_planes[4]= { data,0,0,0 };
 	int src_stride[4]= { width*px_size,0,0,0 };
 	uint8_t *dst_planes[4]= { 0,0,0,0 };
