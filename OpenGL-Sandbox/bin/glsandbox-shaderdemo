@@ -75,9 +75,9 @@ $shaders{vert}= shader('xy_screen') unless grep { $_->type == GL_VERTEX_SHADER }
 
 make_context;
 my $prog= new_program('demo', shaders => \%shaders);
-$prog->activate;
+$prog->bind;
 $prog->set("iResolution", 640, 480, 1.0) if $prog->uniforms->{iResolution};
-vao('unit_quad')->apply;
+vao('unit_quad')->bind;
 my $started= time;
 while (1) {
 	$prog->set("iTime", time - $started) if $prog->uniforms->{iTime};
