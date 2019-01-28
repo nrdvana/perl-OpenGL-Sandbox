@@ -97,6 +97,21 @@ extern void glProgramUniformMatrix4x3dv( GLuint program, GLint location, GLsizei
 #define SCALAR_REF_DATA(obj) (SvROK(obj) && SvPOK(SvRV(obj))? (void*)SvPVX(SvRV(obj)) : (void*)0)
 #define SCALAR_REF_LEN(obj)  (SvROK(obj) && SvPOK(SvRV(obj))? SvCUR(SvRV(obj)) : 0)
 
+int sv_contains_integer(SV *s) {
+	const char *p;
+	if (SvIOK(sv)) return 1;
+	if (SvPOK(sv)) {
+		p= SvPV_nolen(sv);
+		if (*p == '-') p++;
+		while (*p) {
+			if (*p < '0' || *p > '9') return 0;
+			p++;
+		}
+		return 1;
+	}
+	return 0;
+}
+
 /* Reading from perl hashes is annoying.  This simplified function only returns
  * non-NULL if the key existed and the value was defined.
  */

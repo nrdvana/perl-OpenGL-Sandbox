@@ -75,6 +75,7 @@ sub _build_id { gen_buffers(1) }
 
 has filename   => ( is => 'rw' );
 has autoload   => ( is => 'rw' );
+has _mmap      => ( is => 'rw', init_arg => undef );
 
 =head1 METHODS
 
@@ -163,8 +164,54 @@ sub load_at {
 	$self;
 }
 
+=head2 mmap
+
+  my $mmap= $buffer->mmap($mode);
+  my $mmap= $buffer->mmap($mode, $offset, $length);
+
+Call glMapBuffer (or glMapNamedBuffer) to memory-map the buffer into the current process.
+The C<$mode> can be a GL constant of C<GL_READ_ONLY>, C<GL_WRITE_ONLY>, C<GL_READ_WRITE>
+or a perl style mode of C<r>, C<w>, C<r+>.
+
+On OpenGL < 4.5, the buffer gets automatically mapped to its L</target> to perform the mapping.
+OpenGL 4.5 introduced glMapNamedBuffer which avoids the need for binding.
+
+The memory-map object persists for the live of this buffer object or until you call C<unmap>.
+Until then, C<mmap> acts as an attribute to return the previous value to you.
+
+=head2 unmap
+
+Release a memory-mapping of this buffer, if any.  If OpenGL < 4.5, this forces the buffer to
+get mapped first.  This happens automatically on object destruction.  If automatically
+destroyed on OpenGL < 4.5, it genertes a warning, since messing with global state during
+object destruction is a bad thing.
+
+=cut
+
+sub mmap {
+	my ($self, $mode, $offset, $length)= @_;
+	my $current= $self->_mmap;
+	if ($current) {
+		return $current->[0] if @_ == 1;
+		croak "Buffer is already memory mapped";
+	}
+	my $mmap= mmap_buffer($self->id, $self->target, $mode, $offset, $length);
+	$self->_mmap( [ $mmap, $mode, $offset, $length ] );
+	$mmap;
+}
+
+sub unmap {
+	my ($self)= @_;
+	if ($self->_mmap) {
+		unmap_buffer($self->id, $self->target, $self->_mmap->[0]);
+		$self->_mmap(undef);
+	}
+	$self;
+}
+
 sub DESTROY {
 	my $self= shift;
+	$self->unmap if $self->_mmap;
 	delete_buffers(delete $self->{id}) if $self->has_id;
 }
 

@@ -237,6 +237,11 @@ int _round_up_pow2(long dim) {
 	return ++dim;
 }
 
+/* for diagnosing changes to memory-mapped scalar refs */
+int _get_scalarref_pv(SV *) {
+	return (int) SCALAR_REF_DATA(sref);
+}
+
 SV* _img_rescale_to_pow2_square(int width, int height, int has_alpha, int want_bgr, SV *sref) {
 	struct SwsContext *sws= NULL;
 	SV *ret= NULL;
@@ -337,6 +342,105 @@ void load_buffer_sub_data(int target, long offset, SV *size_sv, SV *data_sv, SV 
 	size= (size_sv && SvOK(size_sv))? SvUV(size_sv) : data_size;
 	if (data_size < size) croak("Data not long enough (%d bytes, you requested %d)", data_size, size);
 	glBufferSubData(target, offset, size, data);
+}
+
+SV *mmap_buffer(int buffer_id, SV *buffer_target, SV *access_sv, SV *offset_sv, SV *length_sv) {
+	int gl_maj= 0, gl_min= 0;
+	int access= 0, access_r= 0, access_w= 0, mode;
+	GLint actual_size, target;
+	unsigned len, offset, length;
+	const char* access_pv;
+	void *addr;
+	
+	/* OpenGL 2.0 only has MapBuffer, 3.0 has MapBufferRange (needed for access flags)
+	 * and OpenGL 4.5 has MapNamedBufferRange needed to avoid binding the buffer first
+	 */
+	glGetIntegerv(GL_MAJOR_VERSION, &gl_maj);
+	glGetIntegerv(GL_MINOR_VERSION, &gl_min);
+	
+	/* 'access' can be given as a symbolic string, or as an integer.  If omitted, assume "r+".
+	 * OpenGL < 3.0 won't even have the constants available for GL_MAP_*, so the symbolic
+	 * constants allow generic access to the API without worrying about that.
+	 */
+	if (!SvOK(access_sv)) {
+		access_r= 1;
+		access_w= 1;
+		#ifdef GL_VERSION_3_0
+		access= GL_MAP_READ_BIT | GL_MAP_WRITE_BIT;
+		#endif
+	}
+	#ifdef GL_VERSION_3_0
+	else if (sv_contains_integer(access_sv)) {
+		access= SvIV(access_sv);
+		access_r= (access & GL_MAP_READ_BIT)? 1 : 0;
+		access_w= (access & GL_MAP_WRITE_BIT)? 1 : 0;
+	}
+	#endif
+	else {
+		access_pv= SvPV(access_sv, len);
+		if (len < 1) croak("Invalid symbolic access notation \"\"");
+		while (*access_pv) {
+			switch (*access_pv++) {
+			case '+': access_r= 1, access_w= 1; break;
+			case 'r': access_r= 1; break;
+			case 'w': access_w= 1; break;
+			default: croak "Invalid symbolic access notation '%s' in '%s'", access_pv[-1], SvPV_nolen(access_sv));
+		}
+		#ifdef GL_VERSION_3_0
+		access= (access_r? GL_MAP_READ_BIT : 0) | (access_w? GL_MAP_WRITE_BIT : 0);
+		#endif
+	}
+	
+	offset= SvOK(offset_sv)? SvUV(offset) : 0;
+	length= SvOK(length_sv)? SvUV(length) : 0;
+
+	/* OpenGL 4.5 can look up size and map buffer without binding first */
+	#ifdef GL_VERSION_4_5
+	if (gl_maj >= 4 && gl_min >= 5) {
+		glGetNamedBufferParameteriv(target, GL_BUFFER_SIZE, &actual_size);
+		if (offset > actual_size) croak("Offset %d exceeds actual buffer size %d", offset, actual_size);
+		if (offset+length > actual_size) croak("Length %d exceeds actual buffer size %d", length, actual_size);
+		if (!length) length= actual_size - offset;
+		if (!(addr= glMapNamedBufferRange(buffer_id, offset, length, access)))
+			croak("glMapNamedBufferRange failed");
+	}
+	else {
+	#endif
+		if (!SvOK(target_sv)) croak("Require GL buffer target on OpenGL < 4.5");
+		target= SvIV(target_sv);
+		glBindBuffer(target, buffer_id);
+		glGetBufferParameteriv(target, GL_BUFFER_SIZE, &actual_size);
+		if (offset > actual_size) croak("Offset %d exceeds actual buffer size %d", offset, actual_size);
+		if (offset+length > actual_size) croak("Length %d exceeds actual buffer size %d", length, actual_size);
+		if (!length) length= actual_size - offset;
+		/* OpenGL 3.0 is required for BufferRange, else fall back to mapping whole thing. */
+		#ifdef GL_VERSION_3_0
+		if (gl_maj >= 3) {
+			if (!(addr= glMapBufferRange(target, offset, length, access)))
+				croak("glMapBufferRange failed");
+		}
+		else
+		#else
+		{
+			mode= access_r && access_w? GL_READ_WRITE
+				  : access_r? GL_READ_ONLY
+				  : access_w? GL_WRITE_ONLY
+				  : croak("Must specify read or write access");
+			if (!(addr= glMapBuffer(target, mode)))
+				croak("glMapBuffer failed");
+			/* OpenGL mapped all of it, but we can just pretend we did a sub-range */
+			addr= (void*) (((char*) addr) + offset);
+		}
+		#endif
+	#ifdef GL_VERSION_4_5
+	}
+	#endif
+
+	/* at this point, have buffer mapped and know length */
+	create_sv_view_of_data(addr, length, );
+}
+
+int unmap_buffer(int buffer_id, SV *buffer_target, SV *memmap) {
 }
 
 const char* get_glsl_type_name(int type) {
