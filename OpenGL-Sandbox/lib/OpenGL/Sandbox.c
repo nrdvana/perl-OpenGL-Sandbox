@@ -14,6 +14,7 @@ int _gl_get_integer(int id) {
 void gen_textures(int count) {
 	Inline_Stack_Vars;
 	GLuint static_buf[16], *buf, i;
+	(void)items; /* squelch warning */
 
 	if (count < sizeof(static_buf)/sizeof(GLuint))
 		buf= static_buf;
@@ -57,6 +58,7 @@ void delete_textures(SV *first, ...) {
 void gen_buffers(int count) {
 	Inline_Stack_Vars;
 	GLuint static_buf[16], *buf, i;
+	(void)items; /* suppress warning */
 
 	if (count < sizeof(static_buf)/sizeof(GLuint))
 		buf= static_buf;
@@ -96,9 +98,11 @@ void delete_buffers(unsigned buf_id) {
 
 #endif
 #ifdef GL_VERSION_3_0
+
 void gen_vertex_arrays(int count) {
 	Inline_Stack_Vars;
 	GLuint static_buf[16], *buf, i;
+	(void)items; /* suppress warning */
 
 	if (count < sizeof(static_buf)/sizeof(GLuint))
 		buf= static_buf;
@@ -201,7 +205,7 @@ void _texture_load_rgb_square(HV *self, SV *mmap, int is_bgr) {
 	}
 	glTexImage2D(GL_TEXTURE_2D, 0, gl_internal_fmt, dim, dim, 0, gl_fmt, GL_UNSIGNED_BYTE, data);
 	if (with_mipmaps && major >= 3) {
-		/* glEnable(GL_TEXTURE_2D); /* correct bug in ATI, accoridng to Khronos FAQ */
+		/* glEnable(GL_TEXTURE_2D);  correct bug in ATI, accoridng to Khronos FAQ */
 		glGenerateMipmap(GL_TEXTURE_2D);
 		/* examples show setting these after mipmap generation.  Does it matter? */
 		if (mag_filter_p)
@@ -238,15 +242,15 @@ int _round_up_pow2(long dim) {
 }
 
 /* for diagnosing changes to memory-mapped scalar refs */
-int _get_scalarref_pv(SV *) {
-	return (int) SCALAR_REF_DATA(sref);
+intptr_t _get_scalarref_pv(SV *sv) {
+	return (intptr_t) SCALAR_REF_DATA(sv);
 }
 
 SV* _img_rescale_to_pow2_square(int width, int height, int has_alpha, int want_bgr, SV *sref) {
 	struct SwsContext *sws= NULL;
 	SV *ret= NULL;
 	void *data= SCALAR_REF_DATA(sref);
-	int len= SCALAR_REF_LEN(sref);
+	size_t len= SCALAR_REF_LEN(sref);
 	int px_size= has_alpha? 4 : 3;
 	int dim= _round_up_pow2(width > height? width : height);
 	const uint8_t *src_planes[4]= { data,0,0,0 };

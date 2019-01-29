@@ -19,6 +19,15 @@
 extern void glGenerateMipmap(int);
 extern void glGenBuffers( GLsizei n, GLuint * buffers);
 extern void glDeleteBuffers( GLsizei n, const GLuint * buffers);
+extern void glGenVertexArrays( GLsizei count, GLuint *buffers);
+extern void glDeleteVertexArrays( GLsizei n, const GLuint * buffers);
+extern void glBindBuffer(GLenum target, GLuint buffer);
+extern void glGetBufferParameteriv(GLenum target, GLenum value, GLint * data);
+extern void glGetNamedBufferParameteriv(GLuint buffer, GLenum pname, GLint *params);
+extern void *glMapBufferRange(GLenum target, GLintptr offset, GLsizeiptr length, GLbitfield access);
+extern void *glMapNamedBufferRange(GLuint buffer, GLintptr offset, GLsizeiptr length, GLbitfield access);
+extern GLboolean glUnmapBuffer(GLenum target);
+extern GLboolean glUnmapNamedBuffer(GLuint buffer);
 extern void glBufferData( GLenum target, GLsizeiptr size, const GLvoid * data, GLenum usage);
 extern void glBufferSubData( GLenum target, GLintptr offset, GLsizeiptr size, const GLvoid * data);
 extern void glGetProgramiv( GLuint program, GLenum pname, GLint *params);
@@ -100,7 +109,7 @@ extern void glProgramUniformMatrix4x3dv( GLuint program, GLint location, GLsizei
 #define SCALAR_REF_DATA(obj) (SvROK(obj) && SvPOK(SvRV(obj))? (void*)SvPVX(SvRV(obj)) : (void*)0)
 #define SCALAR_REF_LEN(obj)  (SvROK(obj) && SvPOK(SvRV(obj))? SvCUR(SvRV(obj)) : 0)
 
-int sv_contains_integer(SV *s) {
+int sv_contains_integer(SV *sv) {
 	const char *p;
 	if (SvIOK(sv)) return 1;
 	if (SvPOK(sv)) {
@@ -222,3 +231,4 @@ int _dimension_from_filesize(int filesize, int *has_alpha_out) {
 		return dim;
 	}
 }
+
