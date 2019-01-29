@@ -351,7 +351,7 @@ void load_buffer_sub_data(int target, long offset, SV *size_sv, SV *data_sv, SV 
 SV *mmap_buffer(int buffer_id, SV *target_sv, SV *access_sv, SV *offset_sv, SV *length_sv) {
 	int gl_maj= 0, gl_min= 0;
 	int access= 0, access_r= 0, access_w= 0, mode;
-	GLint actual_size, target;
+	GLint actual_size= 0, target;
 	STRLEN len;
 	unsigned offset, length;
 	const char* access_pv;
@@ -406,21 +406,32 @@ SV *mmap_buffer(int buffer_id, SV *target_sv, SV *access_sv, SV *offset_sv, SV *
 	#ifdef GL_VERSION_4_5
 	if (gl_maj >= 4 && gl_min >= 5) {
 		glGetNamedBufferParameteriv(target, GL_BUFFER_SIZE, &actual_size);
-		if (offset > actual_size) croak("Offset %d exceeds actual buffer size %d", offset, actual_size);
-		if (offset+length > actual_size) croak("Length %d exceeds actual buffer size %d", length, actual_size);
-		if (!length) length= actual_size - offset;
-		if (!(addr= glMapNamedBufferRange(buffer_id, offset, length, access)))
-			croak("glMapNamedBufferRange failed");
 	}
-	else {
+	else
 	#endif
+	{
 		if (!SvOK(target_sv)) croak("Require GL buffer target on OpenGL < 4.5");
 		target= SvIV(target_sv);
 		glBindBuffer(target, buffer_id);
 		glGetBufferParameteriv(target, GL_BUFFER_SIZE, &actual_size);
-		if (offset > actual_size) croak("Offset %d exceeds actual buffer size %d", offset, actual_size);
-		if (offset+length > actual_size) croak("Length %d exceeds actual buffer size %d", length, actual_size);
-		if (!length) length= actual_size - offset;
+	}
+
+	/* Make sure the length and offset make sense */
+	if (!actual_size) croak("Cannot mem-map buffer until storage has been allocated");
+	if (offset > actual_size) croak("Offset %d exceeds actual buffer size %d", offset, actual_size);
+	if (offset+length > actual_size) croak("Length %d exceeds actual buffer size %d", length, actual_size);
+	if (!length) length= actual_size - offset;
+	if (!length) croak("Cannot map zero bytes of a buffer"); 
+
+	/* OpenGL 4.5 can look up size and map buffer without binding first */
+	#ifdef GL_VERSION_4_5
+	if (gl_maj >= 4 && gl_min >= 5) {
+		if (!(addr= glMapNamedBufferRange(buffer_id, offset, length, access)))
+			croak("glMapNamedBufferRange failed");
+	}
+	else
+	#endif
+	{
 		/* OpenGL 3.0 is required for BufferRange, else fall back to mapping whole thing. */
 		#ifdef GL_VERSION_3_0
 		if (gl_maj >= 3) {
@@ -440,9 +451,7 @@ SV *mmap_buffer(int buffer_id, SV *target_sv, SV *access_sv, SV *offset_sv, SV *
 			/* OpenGL mapped all of it, but we can just pretend we did a sub-range */
 			addr= (void*) (((char*) addr) + offset);
 		}
-	#ifdef GL_VERSION_4_5
 	}
-	#endif
 
 	/* at this point, have buffer mapped and know length */
 	sv= sv_newmortal();

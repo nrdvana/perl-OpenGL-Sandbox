@@ -35,8 +35,9 @@ ok( !log_gl_errors, 'load_at: no GL errors' );
 substr( ${$buf->mmap}, 20, 40 )= "z"x40;
 
 $buf->unmap;
-is( ${$buf->mmap}, ("x"x20).("z"x40).("y"x70).("x"x20), 'memory map was written' );
+is( ${$buf->mmap('r+', 10, 80)}, ("x"x10).("z"x40).("y"x30), 'memory map sub-range matches expected' );
 
 undef $buf;
+ok( !log_gl_errors, 'load_at: no GL errors' );
 
 done_testing;
