@@ -26,8 +26,16 @@ $buf->load("x" x 150);
 ok( !log_gl_errors, 'load: no GL errors' );
 is( $buf->usage, GL_STATIC_DRAW(), 'got default usage hint' );
 
-$buf->load_at(50, "x"x120, 20);
+$buf->load_at(50, "y"x100, 20);
 ok( !log_gl_errors, 'load_at: no GL errors' );
+
+is( ${$buf->mmap}, ("x" x 50).("y" x 80).("x" x 20), "memory map works" );
+ok( !log_gl_errors, 'load_at: no GL errors' );
+
+substr( ${$buf->mmap}, 20, 40 )= "z"x40;
+
+$buf->unmap;
+is( ${$buf->mmap}, ("x"x20).("z"x40).("y"x70).("x"x20), 'memory map was written' );
 
 undef $buf;
 

@@ -195,7 +195,7 @@ sub mmap {
 		return $current->[0] if @_ == 1;
 		croak "Buffer is already memory mapped";
 	}
-	my $mmap= mmap_buffer($self->id, $self->target, $mode, $offset, $length);
+	my $mmap= OpenGL::Sandbox::mmap_buffer($self->id, $self->target, $mode, $offset, $length);
 	$self->_mmap( [ $mmap, $mode, $offset, $length ] );
 	$mmap;
 }
@@ -203,7 +203,7 @@ sub mmap {
 sub unmap {
 	my ($self)= @_;
 	if ($self->_mmap) {
-		unmap_buffer($self->id, $self->target, $self->_mmap->[0]);
+		OpenGL::Sandbox::unmap_buffer($self->id, $self->target, $self->_mmap->[0]);
 		$self->_mmap(undef);
 	}
 	$self;

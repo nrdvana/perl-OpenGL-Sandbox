@@ -164,28 +164,27 @@ static struct buffer_scalar_info* get_sv_magic(pTHX_ SV* var) {
 
 /* Public API */
 
-extern SV* buffer_scalar_wrap(
+extern void buffer_scalar_wrap(
 	SV *target, void *address, size_t length, int flags,
 	buffer_scalar_callback_data callback_data,
 	buffer_scalar_free_fn destructor
 ) {
 	struct buffer_scalar_info *info;
-	if ((info= get_sv_magic(target)))
-		croak("Scalar is already bound to a foreign buffer");
+	if (SvMAGICAL(target) && mg_find(target, PERL_MAGIC_uvar))
+		croak("Scalar already has scalar magic applied");
 	info= add_sv_magic(target);
 	info->address= address;
 	info->length= length;
 	info->flags= flags;
 	memcpy(info->callback_data, callback_data, sizeof(buffer_scalar_callback_data));
 	info->destructor= destructor;
-	return target;
+	reset_var(target, info);
 }
 
-extern SV* buffer_scalar_unwrap(SV *target) {
+extern void buffer_scalar_unwrap(SV *target) {
 	if (!get_sv_magic(target))
 		croak("Scalar is not bound to a buffer");
 	sv_unmagic(target, PERL_MAGIC_uvar);
-	return target;
 }
 
 extern int buffer_scalar_iswrapped(SV *target) {
