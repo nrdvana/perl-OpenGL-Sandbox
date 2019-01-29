@@ -1,3 +1,6 @@
+/* This file provides the code that wraps scalars with Magic to expost a read/write buffer to perl-space */
+#include "buffer_scalar.c"
+
 #include <GL/gl.h>
 #include <GL/glext.h>
 #include <libavutil/avutil.h>
