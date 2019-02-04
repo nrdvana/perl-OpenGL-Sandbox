@@ -220,7 +220,7 @@ void _texture_load(HV *self, int level, int xoffset, int yoffset, int width, int
 	known_format= _get_format_info(format, NULL, &has_alpha, &default_internal_fmt);
 	if (internal_p) internal_fmt= SvIV(internal_p);
 	else if (known_format) internal_fmt= default_internal_fmt;
-	else carp_croak("No default internal_format for given format %d; must be specified");
+	else carp_croak("No default internal_format for given format %d; must be specified", format);
 	
 	/* use mipmaps if the user set it to true, or if the min_filter uses a mipmap,
 	   and default in absence of any user prefs is true. But not if the user has specified 'level' */
@@ -308,8 +308,8 @@ SV* _img_rescale_to_pow2_square(int width, int height, int has_alpha, int want_b
 	
 	if (!data || !len)
 		carp_croak("Expected non-empty scalar-ref pixel buffer");
-	if (width * height * px_size != len)
-		carp_croak("Size of scalar ref disagrees with rectangle dimensions: %d * %d * %d != %d",
+	if ((size_t)width * height * px_size != len)
+		carp_croak("Size of scalar ref disagrees with rectangle dimensions: %d * %d * %d != %ld",
 			width, height, px_size, len);
 	
 	/* rescale to square */
@@ -387,12 +387,12 @@ void load_buffer_sub_data(int target, long offset, SV *size_sv, SV *data_sv, SV 
 	_get_buffer_from_sv(data_sv, &data, &data_size);
 	if (data_offset_sv && SvOK(data_offset_sv)) {
 		data_offset= SvUV(data_offset_sv);
-		if (data_offset > data_size) carp_croak("Invalid data offset (%d exceeds data length %d)", data_offset, data_size);
+		if (data_offset > data_size) carp_croak("Invalid data offset (%ld exceeds data length %ld)", data_offset, data_size);
 		data += data_offset;
 		data_size -= data_offset;
 	}
 	size= (size_sv && SvOK(size_sv))? SvUV(size_sv) : data_size;
-	if (data_size < size) carp_croak("Data not long enough (%d bytes, you requested %d)", data_size, size);
+	if (data_size < size) carp_croak("Data not long enough (%ld bytes, you requested %ld)", data_size, size);
 	glBufferSubData(target, offset, size, data);
 }
 
@@ -439,7 +439,7 @@ SV *mmap_buffer(int buffer_id, SV *target_sv, SV *access_sv, SV *offset_sv, SV *
 			case '+': access_r= 1, access_w= 1; break;
 			case 'r': access_r= 1; break;
 			case 'w': access_w= 1; break;
-			default: carp_croak("Invalid symbolic access notation '%s' in '%s'", access_pv[-1], SvPV_nolen(access_sv));
+			default: carp_croak("Invalid symbolic access notation '%c' in '%s'", access_pv[-1], SvPV_nolen(access_sv));
 			}
 		}
 		#ifdef GL_VERSION_3_0
@@ -523,6 +523,8 @@ int unmap_buffer(int buffer_id, SV *target_sv, SV *memmap) {
 			return 1;
 		}
 	}
+	#else
+	(void) gl_maj; (void) gl_min; /* stupid warnings */
 	#endif
 	if (!SvOK(target_sv) || !(target= SvIV(target_sv)))
 		carp_croak("Must specify buffer target for OpenGL < 4.5");
@@ -609,8 +611,8 @@ SV * get_program_uniforms(unsigned program) {
 void set_uniform(unsigned program, SV* uniform_cache, const char *name, ...) {
 	Inline_Stack_Vars;
 	SV **entry, *s;
-	int type= 0, component_type, size= 0, loc= 0, components= 0, buf_req= 0, i, cur_prog, arg_i, arg_lim, dest_i;
-	unsigned long buf_size;
+	int type= 0, component_type, size= 0, loc= 0, components= 0, i, cur_prog, arg_i, arg_lim, dest_i;
+	unsigned long buf_size, buf_req= 0;
 	char static_buf[ 8 * 16 ], *buf= NULL;
 	AV *info= NULL;
 	
@@ -710,7 +712,8 @@ void set_uniform(unsigned program, SV* uniform_cache, const char *name, ...) {
 			if (!buf || !buf_size)
 				carp_croak("Don't know how to extract values/buffer from %s", SvPV_nolen(s));
 			if (buf_size < buf_req)
-				carp_croak("Uniform %s is type %s, requiring packed data of at least %d bytes (got %d)", name, get_glsl_type_name(type), buf_req, buf_size);
+				carp_croak("Uniform %s is type %s, requiring packed data of at least %ld bytes (got %ld)",
+					name, get_glsl_type_name(type), buf_req, buf_size);
 		}
 	}
 	/* If not given a packed buffer, recursively iterate the arguments and pack it into one of our own */

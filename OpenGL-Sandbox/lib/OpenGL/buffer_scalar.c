@@ -29,7 +29,6 @@ struct buffer_scalar_info {
 static int buffer_scalar_mg_write(pTHX_ SV *sv, MAGIC* mg);
 static int buffer_scalar_mg_clear(pTHX_ SV *sv, MAGIC *mg);
 static int buffer_scalar_mg_free(pTHX_ SV *sv, MAGIC *mg);
-static int buffer_scalar_mg_dup(pTHX_ SV *sv, MAGIC *mg);
 
 #ifdef MGf_LOCAL
 static int buffer_scalar_mg_local(pTHX_ SV* var, MAGIC* mg) {
