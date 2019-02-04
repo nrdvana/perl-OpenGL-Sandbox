@@ -6,7 +6,7 @@ use Scalar::Util 'weaken';
 use OpenGL::Sandbox qw/ glGetString GL_VERSION /;
 use X11::GLX::DWIM;
 
-# ABSTRACT: Subclass of X11::GLX::DWIM to meet contract of OpenGL::Sandbox::make_context
+# ABSTRACT: Create OpenGL context with X11::GLX::DWIM
 # VERSION
 
 our %instances;

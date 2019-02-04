@@ -6,7 +6,7 @@ use Scalar::Util 'weaken';
 use OpenGL::Sandbox qw/ glGetString GL_VERSION /;
 use SDLx::App;
 
-# ABSTRACT: Subclass of SDLx::App to meet contract of OpenGL::Sandbox::make_context
+# ABSTRACT: Create OpenGL context with SDLx::App
 # VERSION
 
 my %instances;

@@ -10,7 +10,7 @@ use OpenGL::GLFW qw/ glfwInit glfwGetVersionString glfwTerminate NULL GLFW_TRUE 
 	/;
 use OpenGL::Sandbox qw/ glGetString GL_VERSION /;
 
-# ABSTRACT: Context wrapper around OpenGL::GLFW API
+# ABSTRACT: Create OpenGL context with OpenGL::GLFW
 # VERSION
 
 # would use Moo, but I want to write my own constructor rather than store
