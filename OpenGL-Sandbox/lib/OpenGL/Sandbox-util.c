@@ -33,6 +33,7 @@ extern void glDeleteVertexArrays( GLsizei n, const GLuint * buffers);
 extern void glBindBuffer(GLenum target, GLuint buffer);
 extern void glGetBufferParameteriv(GLenum target, GLenum value, GLint * data);
 extern void glGetNamedBufferParameteriv(GLuint buffer, GLenum pname, GLint *params);
+extern void *glMapBuffer(GLenum target, GLenum access);
 extern void *glMapBufferRange(GLenum target, GLintptr offset, GLsizeiptr length, GLbitfield access);
 extern void *glMapNamedBufferRange(GLuint buffer, GLintptr offset, GLsizeiptr length, GLbitfield access);
 extern GLboolean glUnmapBuffer(GLenum target);
