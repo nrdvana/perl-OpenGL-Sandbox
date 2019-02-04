@@ -36,7 +36,6 @@ sub test_load_rgb {
 				is_deeply( [get_gl_errors], [], 'no GL error' );
 				is( $tx->width, $dim, "width=$dim" );
 				is( $tx->height, $dim, "height=$dim" );
-				is( $tx->pow2_size, $dim, "pow2_size=$dim" );
 				ok( !$tx->mipmap, "no mipmaps" );
 				is( !!$tx->has_alpha, !!$alpha, "has_alpha=$alpha" );
 			}
@@ -57,7 +56,6 @@ sub test_load_png {
 			is_deeply( [get_gl_errors], [], 'no GL error' );
 			is( $tx->width, $width, 'width' );
 			is( $tx->height, $height, 'height' );
-			is( $tx->pow2_size, $pow2, 'pow2_size' );
 			is( $tx->has_alpha, $has_alpha, 'alpha' );
 			is( $tx->src_width, $src_w, 'src_width' );
 			is( $tx->src_height, $src_h, 'src_height' );

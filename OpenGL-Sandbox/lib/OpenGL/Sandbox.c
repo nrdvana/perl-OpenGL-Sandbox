@@ -141,40 +141,21 @@ void delete_vertex_arrays(unsigned buf_id) {
 }
 #endif
 
-void _texture_load_rgb_square(HV *self, SV *mmap, int is_bgr) {
+void _texture_load(HV *self, int level, int xoffset, int yoffset, int width, int height, int format, int type, SV *data_sv) {
 	SV *sv;
-	void *data= SCALAR_REF_DATA(mmap);
-	int len= SCALAR_REF_LEN(mmap);
 	const char *ver;
-	int major, minor;
+	void *data;
+	int major, minor, tx_id, data_len, internal_fmt, target, need;
+	int known_format, has_alpha, default_internal_fmt, with_mipmaps;
+	GLint bound_pbo;
 	SV *tx_id_p=  _fetch_if_defined(self, "tx_id", 5);
 	SV *mipmap_p= _fetch_if_defined(self, "mipmap", 6);
 	SV *wrap_s_p= _fetch_if_defined(self, "wrap_s", 6);
 	SV *wrap_t_p= _fetch_if_defined(self, "wrap_t", 6);
 	SV *min_filter_p= _fetch_if_defined(self, "min_filter", 10);
 	SV *mag_filter_p= _fetch_if_defined(self, "mag_filter", 10);
-	int has_alpha= 0;
-	int dim= _dimension_from_filesize(len, &has_alpha);
-	int gl_fmt= is_bgr? ( has_alpha? GL_BGRA : GL_BGR )
-	                  : ( has_alpha? GL_RGBA : GL_RGB );
-	int gl_internal_fmt= has_alpha? GL_RGBA : GL_RGB;
-	
-	if (!tx_id_p) croak("tx_id must be initialized first");
-	
-	/* use mipmaps if the user set it to true, or if the min_filter uses a mipmap,
-	   and default in absence of any user prefs is true. */
-	int with_mipmaps= mipmap_p? SvTRUE(mipmap_p)
-		: !min_filter_p? 1
-		: SvIV(min_filter_p) == GL_NEAREST || SvIV(min_filter_p) == GL_LINEAR ? 0
-		: 1;
-	
-	if (!data || !len)
-		croak("Expected non-empty scalar-ref pixel buffer");
-	
-	/* Ensure the OpenGL context is initialized */
-	//call_pv("OpenGL::Sandbox::_ensure_context", G_VOID | G_NOARGS | G_EVAL);
-	//if (SvTRUE(ERRSV))
-	//	croak(NULL);
+	SV *internal_p= _fetch_if_defined(self, "internal_format", 15);
+	SV *target_p= _fetch_if_defined(self, "target", 6);
 	
 	/* Mipmap strategy depends on version of GL.
 	   Supposedly this GetString is more compatible than GetInteger(GL_VERSION_MAJOR)
@@ -183,8 +164,67 @@ void _texture_load_rgb_square(HV *self, SV *mmap, int is_bgr) {
 	if (!ver || sscanf(ver, "%d.%d", &major, &minor) != 2)
 		croak("Can't get GL_VERSION");
 	
-	/* Bind texture */
-	glBindTexture(GL_TEXTURE_2D, SvIV(tx_id_p));
+	/* TODO: support things other than GL_TEXTURE_2D. */
+	if (target_p && SvIV(target_p) != GL_TEXTURE_2D)
+		croak("Texture targets other than GL_TEXTURE_2D not yet supported");
+	target= GL_TEXTURE_2D;
+
+	/* Data argument is hard to validate.  It should normally be a scalar ref, but could also be NULL to create
+	 * texture storage without loading, and when using PBOs could also be a plain integer offset within the PBO */
+	#ifdef GL_PIXEL_UNPACK_BUFFER_BINDING
+	bound_pbo= 0;
+	if (major >= 2)
+		glGetIntegerv(GL_PIXEL_UNPACK_BUFFER_BINDING, &bound_pbo);
+	if (bound_pbo) {
+		if (SvOK(data_sv) && !(SvIOK(data_sv) || SvUOK(data_sv)))
+			croak("PBO for UNPACK is active; pixel 'data' must be a numeric offset, or undef");
+		data= (void*) SvUV(data_sv);
+	}
+	else
+	#endif
+	{
+		if (SvROK(data_sv)) {
+			data= SCALAR_REF_DATA(data_sv); /* NULL is permitted for using PBOs or initializing storage without loading it */
+			data_len= SCALAR_REF_LEN(data_sv);
+			need= width * height * _get_pixel_size(format, type);
+			if (need > data_len)
+				croak("Require at least %d bytes of pixel data (got %d)", need, data_len);
+		}
+		else if (!SvOK(data_sv) || SvIV(data_sv) == 0) {
+			if (xoffset || yoffset) croak("Can't use NULL pixel data when specifying a sub-image");
+			data= NULL;
+			data_len= 0;
+		}
+		else
+			croak("Expected scalar-ref %sfor data argument", (xoffset || yoffset)? "":"or undef ");
+	}
+	
+	/* TODO: support OpenGL 4.5 which doesn't need to bind to anything */
+	if (!tx_id_p || !(tx_id= SvUV(tx_id_p)))
+		croak("tx_id must be initialized first");
+	glBindTexture(target, tx_id);
+	
+	/* If xoffset or yoffset are nonzero, then this requires the texture to be loaded already,
+	 * and the internal format and mipmap and etc is irrelevant. */
+	if (xoffset || yoffset) {
+		glTexSubImage2D(target, level, xoffset, yoffset, width, height, format, type, data);
+		return;
+	}
+	/* Else we are defining the storage for the texture and more things need considered.
+	 * Also the texture object should be updated with the result of the calculations below. */
+	
+	known_format= _get_format_info(format, NULL, &has_alpha, &default_internal_fmt);
+	if (internal_p) internal_fmt= SvIV(internal_p);
+	else if (known_format) internal_fmt= default_internal_fmt;
+	else croak("No default internal_format for given format %d; must be specified");
+	
+	/* use mipmaps if the user set it to true, or if the min_filter uses a mipmap,
+	   and default in absence of any user prefs is true. But not if the user has specified 'level' */
+	with_mipmaps= level? 0
+		: mipmap_p? SvTRUE(mipmap_p)
+		: !min_filter_p? 1
+		: SvIV(min_filter_p) == GL_NEAREST || SvIV(min_filter_p) == GL_LINEAR ? 0
+		: 1;
 	
 	if (with_mipmaps) {
 		if (major < 3) {
@@ -194,7 +234,7 @@ void _texture_load_rgb_square(HV *self, SV *mmap, int is_bgr) {
 			if (min_filter_p)
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, SvIV(min_filter_p));
 		}
-	} else {
+	} else if (!level) {
 		if (mag_filter_p)
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, SvIV(mag_filter_p));
 		/* this one needs overridden even if user didn't request it, because default uses mipmaps */
@@ -203,7 +243,7 @@ void _texture_load_rgb_square(HV *self, SV *mmap, int is_bgr) {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
 	}
-	glTexImage2D(GL_TEXTURE_2D, 0, gl_internal_fmt, dim, dim, 0, gl_fmt, GL_UNSIGNED_BYTE, data);
+	glTexImage2D(GL_TEXTURE_2D, level, internal_fmt, width, height, 0, format, type, data);
 	if (with_mipmaps && major >= 3) {
 		/* glEnable(GL_TEXTURE_2D);  correct bug in ATI, accoridng to Khronos FAQ */
 		glGenerateMipmap(GL_TEXTURE_2D);
@@ -213,16 +253,20 @@ void _texture_load_rgb_square(HV *self, SV *mmap, int is_bgr) {
 		if (min_filter_p)
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, SvIV(min_filter_p));
 	}
-	if (wrap_s_p)
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, SvIV(wrap_s_p));
-	if (wrap_t_p)
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, SvIV(wrap_t_p));
+	if (!level) {
+		if (wrap_s_p)
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, SvIV(wrap_s_p));
+		if (wrap_t_p)
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, SvIV(wrap_t_p));
+	}
 
 	/* update attributes */
-	if (!hv_store(self, "width",     5, sv=newSViv(dim), 0)
-	 || !hv_store(self, "height",    6, sv=newSViv(dim), 0)
-	 || !hv_store(self, "pow2_size", 9, sv=newSViv(dim), 0)
-	 || !hv_store(self, "has_alpha", 9, sv=newSViv(has_alpha? 1 : 0), 0)
+	if (!hv_store(self, "width",            5, sv=newSViv(width), 0)
+	 || !hv_store(self, "height",           6, sv=newSViv(height), 0)
+	 || (known_format &&
+	    !hv_store(self, "has_alpha",        9, sv=newSViv(has_alpha? 1 : 0), 0))
+	 || !hv_store(self, "internal_format", 15, sv=newSViv(internal_fmt), 0)
+	 || !hv_store(self, "loaded",           6, sv=newSViv(1), 0)
 	) {
 		if (sv) sv_2mortal(sv);
 		croak("Can't store results in supplied hash");

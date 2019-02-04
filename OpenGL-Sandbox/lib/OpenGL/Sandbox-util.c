@@ -232,3 +232,111 @@ int _dimension_from_filesize(int filesize, int *has_alpha_out) {
 	}
 }
 
+int _get_format_info(int format, int *components_p, int *has_alpha_p, int *internal_format_p) {
+	int components, has_alpha, internal_format;
+	switch (format) {
+	#ifdef GL_RED
+	case GL_RED:   components= 1; has_alpha= 0; internal_format= GL_RED; break;
+	#endif
+	#ifdef GL_GREEN
+	case GL_GREEN: components= 1; has_alpha= 0; internal_format= 1; break;
+	case GL_BLUE:  components= 1; has_alpha= 0; internal_format= 1; break;
+	case GL_ALPHA: components= 1; has_alpha= 1; internal_format= 1; break;
+	#endif
+	#ifdef GL_RED_INTEGER
+	case GL_RED_INTEGER: components= 1; has_alpha= 0; internal_format= GL_RED; break;
+	#endif
+	#ifdef GL_RG
+	case GL_RG:         components= 2; has_alpha= 0; internal_format= GL_RG; break;
+	#endif
+	#ifdef GL_RG_INTEGER
+	case GL_RG_INTEGER: components= 2; has_alpha= 0; internal_format= GL_RG; break;
+	#endif
+	#ifdef GL_RGB_INTEGER
+	case GL_RGB_INTEGER: 
+	#endif
+	#ifdef GL_BGR_INTEGER
+	case GL_BGR_INTEGER:
+	#endif
+	#ifdef GL_BGR
+	case GL_BGR:
+	#endif
+	case GL_RGB:   components= 3; has_alpha= 0; internal_format= GL_RGB; break;
+	#ifdef GL_BGRA
+	case GL_BGRA:
+	#endif
+	#ifdef GL_RGBA_INTEGER
+	case GL_RGBA_INTEGER:
+	#endif
+	#ifdef GL_BGRA_INTEGER
+	case GL_BGRA_INTEGER:
+	#endif
+	case GL_RGBA: components= 4; has_alpha= 1; internal_format= GL_RGBA; break;
+	#ifdef GL_DEPTH_COMPONENT
+	case GL_DEPTH_COMPONENT: components= 1; has_alpha= 0; internal_format= GL_DEPTH_COMPONENT; break;
+	case GL_DEPTH_STENCIL:   components= 2; has_alpha= 0; internal_format= GL_DEPTH_STENCIL; break;
+	#endif
+	#ifdef GL_STENCIL_INDEX
+	case GL_STENCIL_INDEX:   components= 1; has_alpha= 0; internal_format= GL_STENCIL_INDEX8; break;
+	#endif
+	#ifdef GL_LUMINANCE
+	case GL_LUMINANCE:       components= 1; has_alpha= 0; internal_format= GL_RGB; break;
+	case GL_LUMINANCE_ALPHA: components= 2; has_alpha= 1; internal_format= GL_RGBA; break;
+	#endif
+	#ifdef GL_COLOR_INDEX
+	case GL_COLOR_INDEX:     components= 1; has_alpha= 0; internal_format= 1; break;
+	#endif
+	default:
+		return 0;
+	}
+	if (components_p) *components_p= components;
+	if (has_alpha_p) *has_alpha_p= has_alpha;
+	if (internal_format_p) *internal_format_p= internal_format;
+	return 1;
+}
+
+/* Given the 'format' and 'type' arguments of glTexImage2D, calculate how big each pixel is,
+ * so that we can validate whether the user passed enough data.
+ * Honestly I probably don't know enough to fully implement this correctly, but I figure these
+ * guesses should cover any typical thing someone might try with Sandbox, and provide a small
+ * level of safety against overrunning a buffer.
+ */
+int _get_pixel_size(int format, int type) {
+	int mul, components;
+	switch (type) {
+	#ifdef GL_UNSIGNED_BYTE_3_3_2
+	case GL_UNSIGNED_BYTE_3_3_2:
+	case GL_UNSIGNED_BYTE_2_3_3_REV: return 1;
+	#endif
+	case GL_UNSIGNED_SHORT_5_6_5:
+	case GL_UNSIGNED_SHORT_4_4_4_4:
+	case GL_UNSIGNED_SHORT_5_5_5_1:
+	#ifdef GL_UNSIGNED_SHORT_5_6_5_REV
+	case GL_UNSIGNED_SHORT_5_6_5_REV:
+	case GL_UNSIGNED_SHORT_4_4_4_4_REV:
+	case GL_UNSIGNED_SHORT_1_5_5_5_REV:
+	#endif
+		return 2;
+	#ifdef GL_UNSIGNED_INT_8_8_8_8
+	case GL_UNSIGNED_INT_8_8_8_8:
+	case GL_UNSIGNED_INT_10_10_10_2:
+	case GL_UNSIGNED_INT_8_8_8_8_REV:
+	case GL_UNSIGNED_INT_2_10_10_10_REV: return 4;
+	#endif
+	case GL_UNSIGNED_BYTE:
+	case GL_BYTE:
+		mul= 1;
+		if (0)
+	case GL_UNSIGNED_SHORT:
+	case GL_SHORT:
+			mul= 2;
+		if (0)
+	case GL_UNSIGNED_INT:
+	case GL_INT:
+	case GL_FLOAT:
+			mul= 4;
+		if (_get_format_info(format, &components, NULL, NULL))
+			return mul * components;
+	}
+	return 0;
+}
