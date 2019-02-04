@@ -39,14 +39,14 @@ void delete_textures(SV *first, ...) {
 	
 	/* first pass, try static buffer */
 	for (i= 0, dest_i= 0; i < Inline_Stack_Items; i++)
-		_recursive_pack(aTHX_ buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
+		_recursive_pack(buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
 	n= dest_i;
 	/* If too many, second pass with dynamic buffer */
 	if (n > sizeof(static_buf)/sizeof(GLuint)) {
 		Newx(buf, n, GLuint);
 		SAVEFREEPV(buf); /* perl frees it for us */
 		for (i= 0, dest_i= 0; i < Inline_Stack_Items; i++)
-			_recursive_pack(aTHX_ buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
+			_recursive_pack(buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
 	}
 
 	glDeleteTextures(n, buf);
@@ -82,14 +82,14 @@ void delete_buffers(unsigned buf_id) {
 	buf= static_buf;
 	/* first pass, try static buffer */
 	for (i= 0, dest_i= 0; i < Inline_Stack_Items; i++)
-		_recursive_pack(aTHX_ buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
+		_recursive_pack(buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
 	n= dest_i;
 	/* If too many, second pass with dynamic buffer */
 	if (n > sizeof(static_buf)/sizeof(GLuint)) {
 		Newx(buf, n, GLuint);
 		SAVEFREEPV(buf); /* perl frees it for us */
 		for (i= 0, dest_i= 0; i < Inline_Stack_Items; i++)
-			_recursive_pack(aTHX_ buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
+			_recursive_pack(buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
 	}
 
 	glDeleteBuffers(n, buf);
@@ -126,14 +126,14 @@ void delete_vertex_arrays(unsigned buf_id) {
 	buf= static_buf;
 	/* first pass, try static buffer */
 	for (i= 0, dest_i= 0; i < Inline_Stack_Items; i++)
-		_recursive_pack(aTHX_ buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
+		_recursive_pack(buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
 	n= dest_i;
 	/* If too many, second pass with dynamic buffer */
 	if (n > sizeof(static_buf)/sizeof(GLuint)) {
 		Newx(buf, n, GLuint);
 		SAVEFREEPV(buf); /* perl frees it for us */
 		for (i= 0, dest_i= 0; i < Inline_Stack_Items; i++)
-			_recursive_pack(aTHX_ buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
+			_recursive_pack(buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
 	}
 
 	glDeleteVertexArrays(n, buf);
@@ -375,7 +375,7 @@ void load_buffer_data(int target, SV *size_sv, SV *data_sv, SV *usage_sv) {
 	int usage= usage_sv && SvOK(usage_sv)? SvIV(usage_sv) : GL_STATIC_DRAW;
 	unsigned long size, data_size= 0;
 	char *data= NULL;
-	_get_buffer_from_sv(aTHX_ data_sv, &data, &data_size);
+	_get_buffer_from_sv(data_sv, &data, &data_size);
 	size= (size_sv && SvOK(size_sv))? SvUV(size_sv) : data_size;
 	if (data_size < size) carp_croak("Data not long enough (%d bytes, you requested %d)", data_size, size);
 	glBufferData(target, size, data, usage);
@@ -384,7 +384,7 @@ void load_buffer_data(int target, SV *size_sv, SV *data_sv, SV *usage_sv) {
 void load_buffer_sub_data(int target, long offset, SV *size_sv, SV *data_sv, SV *data_offset_sv) {
 	unsigned long size, data_size= 0, data_offset;
 	char *data= NULL;
-	_get_buffer_from_sv(aTHX_ data_sv, &data, &data_size);
+	_get_buffer_from_sv(data_sv, &data, &data_size);
 	if (data_offset_sv && SvOK(data_offset_sv)) {
 		data_offset= SvUV(data_offset_sv);
 		if (data_offset > data_size) carp_croak("Invalid data offset (%d exceeds data length %d)", data_offset, data_size);
@@ -606,7 +606,7 @@ SV * get_program_uniforms(unsigned program) {
 	return newRV_inc((SV*) result);
 }
 
-void set_uniform(pTHX_ unsigned program, SV* uniform_cache, const char *name, ...) {
+void set_uniform(unsigned program, SV* uniform_cache, const char *name, ...) {
 	Inline_Stack_Vars;
 	SV **entry, *s;
 	int type= 0, component_type, size= 0, loc= 0, components= 0, buf_req= 0, i, cur_prog, arg_i, arg_lim, dest_i;
@@ -706,7 +706,7 @@ void set_uniform(pTHX_ unsigned program, SV* uniform_cache, const char *name, ..
 	if (Inline_Stack_Items == 4) {
 		s= Inline_Stack_Item(3);
 		if (SvROK(s) && SvTYPE(SvRV(s)) != SVt_PVAV) {
-			_get_buffer_from_sv(aTHX_ s, &buf, &buf_size);
+			_get_buffer_from_sv(s, &buf, &buf_size);
 			if (!buf || !buf_size)
 				carp_croak("Don't know how to extract values/buffer from %s", SvPV_nolen(s));
 			if (buf_size < buf_req)
@@ -723,7 +723,7 @@ void set_uniform(pTHX_ unsigned program, SV* uniform_cache, const char *name, ..
 		}
 		dest_i= 0;
 		for (arg_i= 3, arg_lim= Inline_Stack_Items; arg_i < arg_lim; ++arg_i)
-			_recursive_pack(aTHX_ buf, &dest_i, components*size, component_type, Inline_Stack_Item(arg_i));
+			_recursive_pack(buf, &dest_i, components*size, component_type, Inline_Stack_Item(arg_i));
 		if (dest_i != components*size)
 			carp_croak("Uniform %s is type %s, requiring %d values (got %d)", name, get_glsl_type_name(type), components*size, dest_i);
 	}

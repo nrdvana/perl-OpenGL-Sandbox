@@ -1,14 +1,14 @@
 /* This file provides the code that wraps scalars with Magic to expost a read/write buffer to perl-space */
 #include "buffer_scalar.c"
 
-static void carp_croak_sv(pTHX_ SV* value) {
+static void carp_croak_sv(SV* value) {
 	dSP;
 	PUSHMARK(SP);
 	XPUSHs(value);
 	PUTBACK;
 	call_pv("Carp::croak", G_VOID | G_DISCARD);
 }
-#define carp_croak(format_args...) carp_croak_sv(aTHX_ sv_2mortal(newSVpvf(format_args)))
+#define carp_croak(format_args...) carp_croak_sv(sv_2mortal(newSVpvf(format_args)))
 
 #include <GL/gl.h>
 #include <GL/glext.h>
@@ -141,7 +141,7 @@ SV *_fetch_if_defined(HV *self, const char *field, int len) {
 	return (field_p && *field_p && SvOK(*field_p)) ? *field_p : NULL;
 }
 
-void _get_buffer_from_sv(pTHX_ SV *s, char **data, unsigned long *size) {
+void _get_buffer_from_sv(SV *s, char **data, unsigned long *size) {
 	dSP;
 	if (!s || !SvOK(s)) carp_croak("Data is undefined");
 	if (sv_isa(s, "OpenGL::Array")) {
@@ -186,7 +186,7 @@ void _get_buffer_from_sv(pTHX_ SV *s, char **data, unsigned long *size) {
 		carp_croak("Don't know how to get data buffer from %s", SvPV_nolen(s));
 }
 
-void _recursive_pack(pTHX_ void *dest, int *dest_i, int dest_lim, int component_type, SV *val) {
+void _recursive_pack(void *dest, int *dest_i, int dest_lim, int component_type, SV *val) {
 	int i, lim;
 	SV **elem;
 	AV *array;
@@ -196,7 +196,7 @@ void _recursive_pack(pTHX_ void *dest, int *dest_i, int dest_lim, int component_
 			elem= av_fetch(array, i, 0);
 			if (!elem || !*elem)
 				carp_croak("Undefined value in array");
-			_recursive_pack(aTHX_ dest, dest_i, dest_lim, component_type, *elem);
+			_recursive_pack(dest, dest_i, dest_lim, component_type, *elem);
 		}
 	}
 	else {
