@@ -453,7 +453,7 @@ SV *mmap_buffer(int buffer_id, SV *target_sv, SV *access_sv, SV *offset_sv, SV *
 	/* OpenGL 4.5 can look up size and map buffer without binding first */
 	#ifdef GL_VERSION_4_5
 	if (gl_maj >= 4 && gl_min >= 5) {
-		glGetNamedBufferParameteriv(target, GL_BUFFER_SIZE, &actual_size);
+		glGetNamedBufferParameteriv(buffer_id, GL_BUFFER_SIZE, &actual_size);
 	}
 	else
 	#endif

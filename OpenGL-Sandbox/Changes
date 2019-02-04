@@ -1,12 +1,16 @@
-Version 0.049_001 - 2019-01-26
+Version 0.049_002 - 2019-02-04
   - Support for many OpenGL 2+ objects:
      - Buffer
      - VertexArray
      - Shader
      - Program
-  - Many changes to ResMan API
+  - Many changes to ResMan API:
+     - custom resource paths
+     - standardized pattern of new_X() vs. load_X() vs. X()
+     - configurable via OpenGL::Sandbox -resources => {}
+  - Textures can now load arbitrary data, including from PBOs
+  - Fix RGB/BGR texture loading bug in PNG loader
   - Shadertoy-compatible fragment shader demo script
-  - Fix RGB/BGR texture loading error
 
 Version 0.042 - 2019-01-09
   - New API functions: next_frame, current_context, log_gl_errors
