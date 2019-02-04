@@ -39,14 +39,14 @@ void delete_textures(SV *first, ...) {
 	
 	/* first pass, try static buffer */
 	for (i= 0, dest_i= 0; i < Inline_Stack_Items; i++)
-		_recursive_pack(buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
+		_recursive_pack(aTHX_ buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
 	n= dest_i;
 	/* If too many, second pass with dynamic buffer */
 	if (n > sizeof(static_buf)/sizeof(GLuint)) {
 		Newx(buf, n, GLuint);
 		SAVEFREEPV(buf); /* perl frees it for us */
 		for (i= 0, dest_i= 0; i < Inline_Stack_Items; i++)
-			_recursive_pack(buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
+			_recursive_pack(aTHX_ buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
 	}
 
 	glDeleteTextures(n, buf);
@@ -82,14 +82,14 @@ void delete_buffers(unsigned buf_id) {
 	buf= static_buf;
 	/* first pass, try static buffer */
 	for (i= 0, dest_i= 0; i < Inline_Stack_Items; i++)
-		_recursive_pack(buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
+		_recursive_pack(aTHX_ buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
 	n= dest_i;
 	/* If too many, second pass with dynamic buffer */
 	if (n > sizeof(static_buf)/sizeof(GLuint)) {
 		Newx(buf, n, GLuint);
 		SAVEFREEPV(buf); /* perl frees it for us */
 		for (i= 0, dest_i= 0; i < Inline_Stack_Items; i++)
-			_recursive_pack(buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
+			_recursive_pack(aTHX_ buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
 	}
 
 	glDeleteBuffers(n, buf);
@@ -126,14 +126,14 @@ void delete_vertex_arrays(unsigned buf_id) {
 	buf= static_buf;
 	/* first pass, try static buffer */
 	for (i= 0, dest_i= 0; i < Inline_Stack_Items; i++)
-		_recursive_pack(buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
+		_recursive_pack(aTHX_ buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
 	n= dest_i;
 	/* If too many, second pass with dynamic buffer */
 	if (n > sizeof(static_buf)/sizeof(GLuint)) {
 		Newx(buf, n, GLuint);
 		SAVEFREEPV(buf); /* perl frees it for us */
 		for (i= 0, dest_i= 0; i < Inline_Stack_Items; i++)
-			_recursive_pack(buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
+			_recursive_pack(aTHX_ buf, &dest_i, n, GL_UNSIGNED_INT, Inline_Stack_Item(i));
 	}
 
 	glDeleteVertexArrays(n, buf);
@@ -141,6 +141,10 @@ void delete_vertex_arrays(unsigned buf_id) {
 }
 #endif
 
+/* This assumes it is being called as a method on a Texture object.
+ * Anything specific to the current option is passed as a parameter; anything about the
+ * format or configuration of the texture is passed via the object.
+ */
 void _texture_load(HV *self, int level, int xoffset, int yoffset, int width, int height, int format, int type, SV *data_sv) {
 	SV *sv;
 	const char *ver;
@@ -162,11 +166,11 @@ void _texture_load(HV *self, int level, int xoffset, int yoffset, int width, int
 	*/
 	ver= (const char *) glGetString(GL_VERSION);
 	if (!ver || sscanf(ver, "%d.%d", &major, &minor) != 2)
-		croak("Can't get GL_VERSION");
+		carp_croak("Can't get GL_VERSION");
 	
 	/* TODO: support things other than GL_TEXTURE_2D. */
 	if (target_p && SvIV(target_p) != GL_TEXTURE_2D)
-		croak("Texture targets other than GL_TEXTURE_2D not yet supported");
+		carp_croak("Texture targets other than GL_TEXTURE_2D not yet supported");
 	target= GL_TEXTURE_2D;
 
 	/* Data argument is hard to validate.  It should normally be a scalar ref, but could also be NULL to create
@@ -177,7 +181,7 @@ void _texture_load(HV *self, int level, int xoffset, int yoffset, int width, int
 		glGetIntegerv(GL_PIXEL_UNPACK_BUFFER_BINDING, &bound_pbo);
 	if (bound_pbo) {
 		if (SvOK(data_sv) && !(SvIOK(data_sv) || SvUOK(data_sv)))
-			croak("PBO for UNPACK is active; pixel 'data' must be a numeric offset, or undef");
+			carp_croak("PBO for UNPACK is active; pixel 'data' must be a numeric offset, or undef");
 		data= (void*) SvUV(data_sv);
 	}
 	else
@@ -188,15 +192,15 @@ void _texture_load(HV *self, int level, int xoffset, int yoffset, int width, int
 			data_len= SCALAR_REF_LEN(data_sv);
 			need= width * height * _get_pixel_size(format, type);
 			if (need > data_len)
-				croak("Require at least %d bytes of pixel data (got %d)", need, data_len);
+				carp_croak("Require at least %d bytes of pixel data (got %d)", need, data_len);
 		}
 		else if (!SvOK(data_sv) || SvIV(data_sv) == 0) {
-			if (xoffset || yoffset) croak("Can't use NULL pixel data when specifying a sub-image");
+			if (xoffset || yoffset) carp_croak("Can't use NULL pixel data when specifying a sub-image");
 			data= NULL;
 			data_len= 0;
 		}
 		else
-			croak("Expected scalar-ref %sfor data argument", (xoffset || yoffset)? "":"or undef ");
+			carp_croak("Expected scalar-ref %sfor data argument", (xoffset || yoffset)? "":"or undef ");
 	}
 	
 	/* TODO: support OpenGL 4.5 which doesn't need to bind to anything */
@@ -216,7 +220,7 @@ void _texture_load(HV *self, int level, int xoffset, int yoffset, int width, int
 	known_format= _get_format_info(format, NULL, &has_alpha, &default_internal_fmt);
 	if (internal_p) internal_fmt= SvIV(internal_p);
 	else if (known_format) internal_fmt= default_internal_fmt;
-	else croak("No default internal_format for given format %d; must be specified");
+	else carp_croak("No default internal_format for given format %d; must be specified");
 	
 	/* use mipmaps if the user set it to true, or if the min_filter uses a mipmap,
 	   and default in absence of any user prefs is true. But not if the user has specified 'level' */
@@ -243,7 +247,7 @@ void _texture_load(HV *self, int level, int xoffset, int yoffset, int width, int
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
 	}
-	glTexImage2D(GL_TEXTURE_2D, level, internal_fmt, width, height, 0, format, type, data);
+	glTexImage2D(target, level, internal_fmt, width, height, 0, format, type, data);
 	if (with_mipmaps && major >= 3) {
 		/* glEnable(GL_TEXTURE_2D);  correct bug in ATI, accoridng to Khronos FAQ */
 		glGenerateMipmap(GL_TEXTURE_2D);
@@ -303,9 +307,9 @@ SV* _img_rescale_to_pow2_square(int width, int height, int has_alpha, int want_b
 	int dst_stride[4]= { dim*px_size,0,0,0 };
 	
 	if (!data || !len)
-		croak("Expected non-empty scalar-ref pixel buffer");
+		carp_croak("Expected non-empty scalar-ref pixel buffer");
 	if (width * height * px_size != len)
-		croak("Size of scalar ref disagrees with rectangle dimensions: %d * %d * %d != %d",
+		carp_croak("Size of scalar ref disagrees with rectangle dimensions: %d * %d * %d != %d",
 			width, height, px_size, len);
 	
 	/* rescale to square */
@@ -313,7 +317,7 @@ SV* _img_rescale_to_pow2_square(int width, int height, int has_alpha, int want_b
 		dim, dim, want_bgr? (has_alpha? AV_PIX_FMT_BGRA : AV_PIX_FMT_BGR24) : (has_alpha? AV_PIX_FMT_RGBA : AV_PIX_FMT_RGB24),
 		SWS_BICUBIC, NULL, NULL, NULL);
 	if (!sws)
-		croak("can't initialize resize context");
+		carp_croak("can't initialize resize context");
 	
 	/* allocate a "mortal" scalar into which we write the new image */
 	ret= sv_2mortal(newSV(dim*dim*px_size));
@@ -334,7 +338,7 @@ void _img_rgb_to_bgr(SV *sref, int has_alpha) {
 	char *p= SCALAR_REF_DATA(sref), *last, c;
 	int px_size= has_alpha? 4 : 3;
 	int len= SCALAR_REF_LEN(sref);
-	if (!p || len < px_size) croak("Expected non-empty scalar-ref pixel buffer");
+	if (!p || len < px_size) carp_croak("Expected non-empty scalar-ref pixel buffer");
 	last= p + len - px_size;
 	while (p <= last) {
 		c= p[0]; p[0]= p[2]; p[2]= c;
@@ -371,24 +375,24 @@ void load_buffer_data(int target, SV *size_sv, SV *data_sv, SV *usage_sv) {
 	int usage= usage_sv && SvOK(usage_sv)? SvIV(usage_sv) : GL_STATIC_DRAW;
 	unsigned long size, data_size= 0;
 	char *data= NULL;
-	_get_buffer_from_sv(data_sv, &data, &data_size);
+	_get_buffer_from_sv(aTHX_ data_sv, &data, &data_size);
 	size= (size_sv && SvOK(size_sv))? SvUV(size_sv) : data_size;
-	if (data_size < size) croak("Data not long enough (%d bytes, you requested %d)", data_size, size);
+	if (data_size < size) carp_croak("Data not long enough (%d bytes, you requested %d)", data_size, size);
 	glBufferData(target, size, data, usage);
 }
 
 void load_buffer_sub_data(int target, long offset, SV *size_sv, SV *data_sv, SV *data_offset_sv) {
 	unsigned long size, data_size= 0, data_offset;
 	char *data= NULL;
-	_get_buffer_from_sv(data_sv, &data, &data_size);
+	_get_buffer_from_sv(aTHX_ data_sv, &data, &data_size);
 	if (data_offset_sv && SvOK(data_offset_sv)) {
 		data_offset= SvUV(data_offset_sv);
-		if (data_offset > data_size) croak("Invalid data offset (%d exceeds data length %d)", data_offset, data_size);
+		if (data_offset > data_size) carp_croak("Invalid data offset (%d exceeds data length %d)", data_offset, data_size);
 		data += data_offset;
 		data_size -= data_offset;
 	}
 	size= (size_sv && SvOK(size_sv))? SvUV(size_sv) : data_size;
-	if (data_size < size) croak("Data not long enough (%d bytes, you requested %d)", data_size, size);
+	if (data_size < size) carp_croak("Data not long enough (%d bytes, you requested %d)", data_size, size);
 	glBufferSubData(target, offset, size, data);
 }
 
@@ -429,13 +433,13 @@ SV *mmap_buffer(int buffer_id, SV *target_sv, SV *access_sv, SV *offset_sv, SV *
 	#endif
 	else {
 		access_pv= SvPV(access_sv, len);
-		if (len < 1) croak("Invalid symbolic access notation \"\"");
+		if (len < 1) carp_croak("Invalid symbolic access notation \"\"");
 		while (*access_pv) {
 			switch (*access_pv++) {
 			case '+': access_r= 1, access_w= 1; break;
 			case 'r': access_r= 1; break;
 			case 'w': access_w= 1; break;
-			default: croak("Invalid symbolic access notation '%s' in '%s'", access_pv[-1], SvPV_nolen(access_sv));
+			default: carp_croak("Invalid symbolic access notation '%s' in '%s'", access_pv[-1], SvPV_nolen(access_sv));
 			}
 		}
 		#ifdef GL_VERSION_3_0
@@ -454,24 +458,24 @@ SV *mmap_buffer(int buffer_id, SV *target_sv, SV *access_sv, SV *offset_sv, SV *
 	else
 	#endif
 	{
-		if (!SvOK(target_sv)) croak("Require GL buffer target on OpenGL < 4.5");
+		if (!SvOK(target_sv)) carp_croak("Require GL buffer target on OpenGL < 4.5");
 		target= SvIV(target_sv);
 		glBindBuffer(target, buffer_id);
 		glGetBufferParameteriv(target, GL_BUFFER_SIZE, &actual_size);
 	}
 
 	/* Make sure the length and offset make sense */
-	if (!actual_size) croak("Cannot mem-map buffer until storage has been allocated");
-	if (offset > actual_size) croak("Offset %d exceeds actual buffer size %d", offset, actual_size);
-	if (offset+length > actual_size) croak("Length %d exceeds actual buffer size %d", length, actual_size);
+	if (!actual_size) carp_croak("Cannot mem-map buffer until storage has been allocated");
+	if (offset > actual_size) carp_croak("Offset %d exceeds actual buffer size %d", offset, actual_size);
+	if (offset+length > actual_size) carp_croak("Length %d exceeds actual buffer size %d", length, actual_size);
 	if (!length) length= actual_size - offset;
-	if (!length) croak("Cannot map zero bytes of a buffer"); 
+	if (!length) carp_croak("Cannot map zero bytes of a buffer"); 
 
 	/* OpenGL 4.5 can look up size and map buffer without binding first */
 	#ifdef GL_VERSION_4_5
 	if (gl_maj >= 4 && gl_min >= 5) {
 		if (!(addr= glMapNamedBufferRange(buffer_id, offset, length, access)))
-			croak("glMapNamedBufferRange failed");
+			carp_croak("glMapNamedBufferRange failed");
 	}
 	else
 	#endif
@@ -480,18 +484,18 @@ SV *mmap_buffer(int buffer_id, SV *target_sv, SV *access_sv, SV *offset_sv, SV *
 		#ifdef GL_VERSION_3_0
 		if (gl_maj >= 3) {
 			if (!(addr= glMapBufferRange(target, offset, length, access)))
-				croak("glMapBufferRange failed");
+				carp_croak("glMapBufferRange failed");
 		}
 		else
 		#endif
 		{
 			if (!access_r && !access_w)
-				croak("Must specify read or write access");
+				carp_croak("Must specify read or write access");
 			mode= access_r && access_w? GL_READ_WRITE
 				  : access_r? GL_READ_ONLY
 				  : GL_WRITE_ONLY;
 			if (!(addr= glMapBuffer(target, mode)))
-				croak("glMapBuffer failed");
+				carp_croak("glMapBuffer failed");
 			/* OpenGL mapped all of it, but we can just pretend we did a sub-range */
 			addr= (void*) (((char*) addr) + offset);
 		}
@@ -521,7 +525,7 @@ int unmap_buffer(int buffer_id, SV *target_sv, SV *memmap) {
 	}
 	#endif
 	if (!SvOK(target_sv) || !(target= SvIV(target_sv)))
-		croak("Must specify buffer target for OpenGL < 4.5");
+		carp_croak("Must specify buffer target for OpenGL < 4.5");
 	glBindBuffer(target, buffer_id);
 	glUnmapBuffer(target);
 	return 1;
@@ -602,7 +606,7 @@ SV * get_program_uniforms(unsigned program) {
 	return newRV_inc((SV*) result);
 }
 
-void set_uniform(unsigned program, SV* uniform_cache, const char *name, ...) {
+void set_uniform(pTHX_ unsigned program, SV* uniform_cache, const char *name, ...) {
 	Inline_Stack_Vars;
 	SV **entry, *s;
 	int type= 0, component_type, size= 0, loc= 0, components= 0, buf_req= 0, i, cur_prog, arg_i, arg_lim, dest_i;
@@ -617,7 +621,7 @@ void set_uniform(unsigned program, SV* uniform_cache, const char *name, ...) {
 		glGetIntegerv(GL_MAJOR_VERSION, &i);
 		if (i < 4)
 		#endif
-			croak("Can't set uniforms for program other than the current (unless GL >= 4.1)");
+			carp_croak("Can't set uniforms for program other than the current (unless GL >= 4.1)");
 	}
 
 	/* Lazy-build the uniform cache */
@@ -628,19 +632,19 @@ void set_uniform(unsigned program, SV* uniform_cache, const char *name, ...) {
 	/* Find uniform details by name */
 	entry= hv_fetch((HV*) SvRV(uniform_cache), name, strlen(name), 0);
 	if (!entry || !*entry || !SvROK(*entry))
-		croak("No active uniform '%s' in program %d", name, program);
+		carp_croak("No active uniform '%s' in program %d", name, program);
 	if (SvTYPE(SvRV(*entry)) != SVt_PVAV || av_len(info= (AV*) SvRV(*entry)) < 3)
-		croak("Invalid uniform info record for %s", name);
+		carp_croak("Invalid uniform info record for %s", name);
 
 	/* Validate the uniform metadata */
 	entry= av_fetch(info, 1, 0);
-	if (!entry || !*entry || !SvIOK(*entry)) croak("Invalid uniform info record for %s", name);
+	if (!entry || !*entry || !SvIOK(*entry)) carp_croak("Invalid uniform info record for %s", name);
 	loc= SvIV(*entry);
 	entry= av_fetch(info, 2, 0);
-	if (!entry || !*entry || !SvIOK(*entry)) croak("Invalid uniform info record for %s", name);
+	if (!entry || !*entry || !SvIOK(*entry)) carp_croak("Invalid uniform info record for %s", name);
 	type= SvIV(*entry);
 	entry= av_fetch(info, 3, 0);
-	if (!entry || !*entry || !SvIOK(*entry)) croak("Invalid uniform info record for %s", name);
+	if (!entry || !*entry || !SvIOK(*entry)) carp_croak("Invalid uniform info record for %s", name);
 	size= SvIV(*entry);
 
 	/* Determine how many and what type of arguments we want based on type */
@@ -693,7 +697,7 @@ void set_uniform(unsigned program, SV* uniform_cache, const char *name, ...) {
 		break;
 	#endif
 	default:
-		croak("Unimplemented type %d for uniform %s", type, name);
+		carp_croak("Unimplemented type %d for uniform %s", type, name);
 	}
 
 	/* If there is only one argument, and it is a ref, and not an arrayref (those get handled below)
@@ -702,11 +706,11 @@ void set_uniform(unsigned program, SV* uniform_cache, const char *name, ...) {
 	if (Inline_Stack_Items == 4) {
 		s= Inline_Stack_Item(3);
 		if (SvROK(s) && SvTYPE(SvRV(s)) != SVt_PVAV) {
-			_get_buffer_from_sv(s, &buf, &buf_size);
+			_get_buffer_from_sv(aTHX_ s, &buf, &buf_size);
 			if (!buf || !buf_size)
-				croak("Don't know how to extract values/buffer from %s", SvPV_nolen(s));
+				carp_croak("Don't know how to extract values/buffer from %s", SvPV_nolen(s));
 			if (buf_size < buf_req)
-				croak("Uniform %s is type %s, requiring packed data of at least %d bytes (got %d)", name, get_glsl_type_name(type), buf_req, buf_size);
+				carp_croak("Uniform %s is type %s, requiring packed data of at least %d bytes (got %d)", name, get_glsl_type_name(type), buf_req, buf_size);
 		}
 	}
 	/* If not given a packed buffer, recursively iterate the arguments and pack it into one of our own */
@@ -719,9 +723,9 @@ void set_uniform(unsigned program, SV* uniform_cache, const char *name, ...) {
 		}
 		dest_i= 0;
 		for (arg_i= 3, arg_lim= Inline_Stack_Items; arg_i < arg_lim; ++arg_i)
-			_recursive_pack(buf, &dest_i, components*size, component_type, Inline_Stack_Item(arg_i));
+			_recursive_pack(aTHX_ buf, &dest_i, components*size, component_type, Inline_Stack_Item(arg_i));
 		if (dest_i != components*size)
-			croak("Uniform %s is type %s, requiring %d values (got %d)", name, get_glsl_type_name(type), components*size, dest_i);
+			carp_croak("Uniform %s is type %s, requiring %d values (got %d)", name, get_glsl_type_name(type), components*size, dest_i);
 	}
 
 	/* Finally, call glUniform depending on the type */
@@ -771,7 +775,7 @@ void set_uniform(unsigned program, SV* uniform_cache, const char *name, ...) {
 	case GL_DOUBLE_MAT3x4: glUniformMatrix3x4dv(loc, size, 0, (GLdouble*) buf); break;
 	case GL_DOUBLE_MAT4x3: glUniformMatrix4x3dv(loc, size, 0, (GLdouble*) buf); break;
 	#endif
-	default: croak("Unimplemented type %d for uniform %s", type, name);
+	default: carp_croak("Unimplemented type %d for uniform %s", type, name);
 	}
 	#if 0
 	//#ifdef GL_VERSION_4_1
@@ -811,7 +815,7 @@ void set_uniform(unsigned program, SV* uniform_cache, const char *name, ...) {
 		case GL_DOUBLE_MAT4x2: glProgramUniformMatrix4x2dv(program, loc, size, 0, (GLdouble*) buf); break;
 		case GL_DOUBLE_MAT3x4: glProgramUniformMatrix3x4dv(program, loc, size, 0, (GLdouble*) buf); break;
 		case GL_DOUBLE_MAT4x3: glProgramUniformMatrix4x3dv(program, loc, size, 0, (GLdouble*) buf); break;
-		default: croak("Unimplemented type %d for uniform %s", type, name);
+		default: carp_croak("Unimplemented type %d for uniform %s", type, name);
 		}
 	}
 	#endif

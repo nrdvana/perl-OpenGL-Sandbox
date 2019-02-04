@@ -1,6 +1,15 @@
 /* This file provides the code that wraps scalars with Magic to expost a read/write buffer to perl-space */
 #include "buffer_scalar.c"
 
+static void carp_croak_sv(pTHX_ SV* value) {
+	dSP;
+	PUSHMARK(SP);
+	XPUSHs(value);
+	PUTBACK;
+	call_pv("Carp::croak", G_VOID | G_DISCARD);
+}
+#define carp_croak(format_args...) carp_croak_sv(aTHX_ sv_2mortal(newSVpvf(format_args)))
+
 #include <GL/gl.h>
 #include <GL/glext.h>
 #include <libavutil/avutil.h>
@@ -132,9 +141,9 @@ SV *_fetch_if_defined(HV *self, const char *field, int len) {
 	return (field_p && *field_p && SvOK(*field_p)) ? *field_p : NULL;
 }
 
-void _get_buffer_from_sv(SV *s, char **data, unsigned long *size) {
+void _get_buffer_from_sv(pTHX_ SV *s, char **data, unsigned long *size) {
 	dSP;
-	if (!s || !SvOK(s)) croak("Data is undefined");
+	if (!s || !SvOK(s)) carp_croak("Data is undefined");
 	if (sv_isa(s, "OpenGL::Array")) {
 		/* OpenGL::Array has an internal struct and the only way to correctly
 		 * access its ->data field is by calling the perl method ->ptr */
@@ -174,10 +183,10 @@ void _get_buffer_from_sv(SV *s, char **data, unsigned long *size) {
 		*data= SvPV(s, (*size));
 	}
 	else
-		croak("Don't know how to get data buffer from %s", SvPV_nolen(s));
+		carp_croak("Don't know how to get data buffer from %s", SvPV_nolen(s));
 }
 
-void _recursive_pack(void *dest, int *dest_i, int dest_lim, int component_type, SV *val) {
+void _recursive_pack(pTHX_ void *dest, int *dest_i, int dest_lim, int component_type, SV *val) {
 	int i, lim;
 	SV **elem;
 	AV *array;
@@ -186,8 +195,8 @@ void _recursive_pack(void *dest, int *dest_i, int dest_lim, int component_type, 
 		for (i= 0, lim=av_len(array)+1; i < lim; i++) {
 			elem= av_fetch(array, i, 0);
 			if (!elem || !*elem)
-				croak("Undefined value in array");
-			_recursive_pack(dest, dest_i, dest_lim, component_type, *elem);
+				carp_croak("Undefined value in array");
+			_recursive_pack(aTHX_ dest, dest_i, dest_lim, component_type, *elem);
 		}
 	}
 	else {
@@ -199,7 +208,7 @@ void _recursive_pack(void *dest, int *dest_i, int dest_lim, int component_type, 
 			#ifdef GL_VERSION_4_1
 			case GL_DOUBLE:       ((GLdouble*)dest)[*dest_i]= SvNV(val); break;
 			#endif
-			default: croak("Unimplemented");
+			default: carp_croak("Unimplemented: pack data of type %d", component_type);
 			}
 		}
 		/* increment regardless, so we can count how many extra arguments there were */
@@ -222,7 +231,7 @@ int _dimension_from_filesize(int filesize, int *has_alpha_out) {
 		}
 	}
 	if (size != 1 && size != 3)
-		croak("File length 0x%X is not a power of 2 quare of pixels", size);
+		carp_croak("File length 0x%X is not a power of 2 quare of pixels", size);
 	if (size == 1) { /* RGBA, even power of 4 bytes */
 		*has_alpha_out= 1;
 		return dim >> 1;
