@@ -6,7 +6,7 @@ use Try::Tiny;
 use Test::More;
 use lib "$FindBin::Bin/lib";
 use Log::Any::Adapter 'TAP';
-use OpenGL::Sandbox qw/ make_context get_gl_errors /;
+use OpenGL::Sandbox qw/ make_context log_gl_errors GL_RGB /;
 use OpenGL::Sandbox::Texture;
 
 my $ctx= eval { make_context() };
@@ -33,7 +33,7 @@ sub test_load_rgb {
 				close $img1 or die "close: $!";
 				# Load it as a texture
 				my $tx= OpenGL::Sandbox::Texture->new(filename => $fname)->load;
-				is_deeply( [get_gl_errors], [], 'no GL error' );
+				ok( !log_gl_errors, 'No GL errors' );
 				is( $tx->width, $dim, "width=$dim" );
 				is( $tx->height, $dim, "height=$dim" );
 				ok( !$tx->mipmap, "no mipmaps" );
@@ -53,7 +53,7 @@ sub test_load_png {
 		my ($fname, $width, $height, $pow2, $has_alpha, $src_w, $src_h)= @$_;
 		subtest $fname => sub {
 			my $tx= OpenGL::Sandbox::Texture->new(filename => "$datadir/tex/$fname")->load;
-			is_deeply( [get_gl_errors], [], 'no GL error' );
+			ok( !log_gl_errors, 'No GL errors' );
 			is( $tx->width, $width, 'width' );
 			is( $tx->height, $height, 'height' );
 			is( $tx->has_alpha, $has_alpha, 'alpha' );
@@ -62,9 +62,37 @@ sub test_load_png {
 			
 			OpenGL::Sandbox::Texture::convert_png("$datadir/tex/$fname", "$tmp/$fname.rgb");
 			my $tx2= OpenGL::Sandbox::Texture->new(filename => "$tmp/$fname.rgb")->load;
-			is_deeply( [get_gl_errors], [], 'no GL error' );
+			ok( !log_gl_errors, 'No GL errors' );
 			is( $tx2->width, $tx->width, 'width after convert to rgb' );
 		};
+	}
+}
+
+subtest init_no_load => \&test_init_no_load;
+sub test_init_no_load {
+	my @tests= (
+		{ name => 'plain_256_square', width => 256, height => 256, internal_format => GL_RGB }
+	);
+	for (@tests) {
+		my $tx= new_ok( 'OpenGL::Sandbox::Texture', [$_], $_->{name} );
+		$tx->load(data => undef);
+		ok( !log_gl_errors, 'No GL errors' );
+	}
+}
+
+subtest init_manual => \&test_init_manual;
+sub test_init_manual {
+	my @tests= (
+		[ { name => 'plan_32_square' }, { width => 32, height => 32, format => GL_RGB, data => \("x"x(32*32*3)) } ],
+	);
+	for (@tests) {
+		my ($ctor, $call)= @$_;
+		my $tx= new_ok( 'OpenGL::Sandbox::Texture', [$ctor], $ctor->{name} );
+		$tx->load($call);
+		is( $tx->width, $call->{width}, 'width updated' ) if $call->{width};
+		is( $tx->height, $call->{height}, 'height updated' ) if $call->{height};
+		is( $tx->loaded, 1, 'marked as loaded' );
+		ok( !log_gl_errors, 'No GL errors' );
 	}
 }
 

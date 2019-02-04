@@ -242,17 +242,24 @@ sub load {
 	}
 	else {
 		my %opts= @_ == 1? %{ $_[0] } : @_;
-		$self->OpenGL::Sandbox::_texture_load(
-			$opts{level} // 0,
-			$opts{xoffset} // 0,
-			$opts{yoffset} // 0,
-			$opts{width} // $self->width,
-			$opts{height} // $self->height,
-			$opts{format},
-			$opts{type} // GL_UNSIGNED_BYTE,
-			$opts{data}
-		);
+		$self->internal_format(delete $opts{internal_format}) if defined $opts{internal_format};
+		$self->target(delete $opts{target}) if defined $opts{target};
+		my $level= delete $opts{level} // 0;
+		my $xoffset= delete $opts{xoffset} // 0;
+		my $yoffset= delete $opts{yoffset} // 0;
+		my $width= delete $opts{width} // $self->width - $xoffset;
+		my $height= delete $opts{height} // $self->height - $yoffset;
+		defined $opts{format} || !defined $opts{data} or croak("'format' is required");
+		my $format= delete $opts{format} // GL_RGB;
+		my $type= delete $opts{type} // GL_UNSIGNED_BYTE;
+		my $data= delete $opts{data};
+		croak "Unknown options to ->load(): ".join(', ', keys %opts)
+			if keys %opts;
+		$self->tx_id; # make sure initialized
+		$self->OpenGL::Sandbox::_texture_load($level, $xoffset, $yoffset, $width, $height, $format, $type, $data);
+		# that call automatically sets ->width and ->height and ->internal_format and ->loaded(1)
 	}
+	$self;
 }
 
 =head2 load_rgb
