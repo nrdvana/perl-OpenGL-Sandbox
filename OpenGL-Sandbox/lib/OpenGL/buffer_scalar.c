@@ -22,7 +22,7 @@ struct buffer_scalar_info {
 	char* address;
 	size_t length;
 	int flags;
-	buffer_scalar_callback_data callback_data;
+	buffer_scalar_callback_data_t callback_data;
 	buffer_scalar_free_fn destructor;
 };
 
@@ -165,7 +165,7 @@ static struct buffer_scalar_info* get_sv_magic(pTHX_ SV* var) {
 
 extern void buffer_scalar_wrap(
 	SV *target, void *address, size_t length, int flags,
-	buffer_scalar_callback_data callback_data,
+	buffer_scalar_callback_data_t cbdata,
 	buffer_scalar_free_fn destructor
 ) {
 	struct buffer_scalar_info *info;
@@ -175,7 +175,7 @@ extern void buffer_scalar_wrap(
 	info->address= address;
 	info->length= length;
 	info->flags= flags;
-	memcpy(info->callback_data, callback_data, sizeof(buffer_scalar_callback_data));
+	memcpy(info->callback_data, cbdata, sizeof(buffer_scalar_callback_data_t));
 	info->destructor= destructor;
 	reset_var(target, info);
 }

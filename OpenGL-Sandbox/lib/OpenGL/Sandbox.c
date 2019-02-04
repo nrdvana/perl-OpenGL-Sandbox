@@ -405,7 +405,7 @@ SV *mmap_buffer(int buffer_id, SV *target_sv, SV *access_sv, SV *offset_sv, SV *
 	const char* access_pv;
 	void *addr;
 	SV *sv;
-	buffer_scalar_callback_data cbdata;
+	buffer_scalar_callback_data_t cbdata;
 	
 	/* OpenGL 2.0 only has MapBuffer, 3.0 has MapBufferRange (needed for access flags)
 	 * and OpenGL 4.5 has MapNamedBufferRange needed to avoid binding the buffer first
@@ -502,8 +502,9 @@ SV *mmap_buffer(int buffer_id, SV *target_sv, SV *access_sv, SV *offset_sv, SV *
 	}
 
 	/* at this point, have buffer mapped and know length */
-	sv= sv_newmortal();
-	buffer_scalar_wrap(newSVrv(sv, "OpenGL::Sandbox::MMap"), addr, length, access_w? 0 : BUFFER_SCALAR_READONLY, cbdata, NULL);
+	sv= sv_2mortal(newRV_noinc((SV*)newSV(0)));
+	buffer_scalar_wrap(SvRV(sv), addr, length, access_w? 0 : BUFFER_SCALAR_READONLY, cbdata, NULL);
+	sv_bless(sv, gv_stashpv("OpenGL::Sandbox::MMap", GV_ADD));
 	return SvREFCNT_inc(sv);
 }
 
