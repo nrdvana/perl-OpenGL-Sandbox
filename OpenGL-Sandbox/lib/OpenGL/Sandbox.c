@@ -144,14 +144,15 @@ void delete_vertex_arrays(unsigned buf_id) {
 /* This assumes it is being called as a method on a Texture object.
  * Anything specific to the current option is passed as a parameter; anything about the
  * format or configuration of the texture is passed via the object.
+ * The object is updated to match any new details about what was loaded into it.
  */
-void _texture_load(HV *self, int level, int xoffset, int yoffset, int width, int height, int format, int type, SV *data_sv) {
+void _texture_load(HV *self, int level, int xoffset, int yoffset, int width, int height, int format, int type, SV *data_sv, int pitch) {
 	SV *sv;
 	const char *ver;
 	void *data;
-	int major, minor, tx_id, data_len, internal_fmt, target, need;
+	int major, minor, tx_id, data_len, internal_fmt, pixel_size, target, need;
 	int known_format, has_alpha, default_internal_fmt, with_mipmaps;
-	GLint bound_pbo;
+	GLint bound_pbo, orig_pix_align, orig_row_len, pix_align, row_len;
 	SV *tx_id_p=  _fetch_if_defined(self, "tx_id", 5);
 	SV *mipmap_p= _fetch_if_defined(self, "mipmap", 6);
 	SV *wrap_s_p= _fetch_if_defined(self, "wrap_s", 6);
@@ -173,6 +174,9 @@ void _texture_load(HV *self, int level, int xoffset, int yoffset, int width, int
 		carp_croak("Texture targets other than GL_TEXTURE_2D not yet supported");
 	target= GL_TEXTURE_2D;
 
+	known_format= _get_format_info(format, NULL, &has_alpha, &default_internal_fmt);
+	pixel_size= _get_pixel_size(format, type);
+
 	/* Data argument is hard to validate.  It should normally be a scalar ref, but could also be NULL to create
 	 * texture storage without loading, and when using PBOs could also be a plain integer offset within the PBO */
 	#ifdef GL_PIXEL_UNPACK_BUFFER_BINDING
@@ -190,7 +194,7 @@ void _texture_load(HV *self, int level, int xoffset, int yoffset, int width, int
 		if (SvROK(data_sv)) {
 			data= SCALAR_REF_DATA(data_sv); /* NULL is permitted for using PBOs or initializing storage without loading it */
 			data_len= SCALAR_REF_LEN(data_sv);
-			need= width * height * _get_pixel_size(format, type);
+			need= width * height * pixel_size;
 			if (need > data_len)
 				carp_croak("Require at least %d bytes of pixel data (got %d)", need, data_len);
 		}
@@ -208,16 +212,43 @@ void _texture_load(HV *self, int level, int xoffset, int yoffset, int width, int
 		croak("tx_id must be initialized first");
 	glBindTexture(target, tx_id);
 	
+	if (pitch) {
+		/* OpenGL doesn't do row length in bytes, it does it in pixels. This is not helpful. */
+		if (!pixel_size)
+			croak("Don't know how to apply 'pitch' to pixels of format=%d type=%d", format, type);
+		switch (pitch > 0 ? pitch % pixel_size : -1) {
+		case 0: pix_align= 1; row_len= pitch / pixel_size; break;
+		case 1: if ((pitch & 1) == 0) { pix_align= 2; row_len= pitch / pixel_size; break; }
+		case 2:
+		case 3: if ((pitch & 3) == 0) { pix_align= 4; row_len= pitch / pixel_size; break; }
+		case 4:
+		case 5:
+		case 6:
+		case 7: if ((pitch & 7) == 0) { pix_align= 8; row_len= pitch / pixel_size; break; }
+		default:
+			croak("Unsupported buffer pitch %d for pixel size %d", pitch, pixel_size);
+		}
+		glGetIntegerv(GL_UNPACK_ALIGNMENT, &orig_pix_align);
+		glGetIntegerv(GL_UNPACK_ROW_LENGTH, &orig_row_len);
+	}
+	
 	/* If xoffset or yoffset are nonzero, then this requires the texture to be loaded already,
 	 * and the internal format and mipmap and etc is irrelevant. */
 	if (xoffset || yoffset) {
+		if (pitch) {
+			glPixelStorei(GL_UNPACK_ROW_LENGTH, row_len);
+			glPixelStorei(GL_UNPACK_ALIGNMENT, pix_align);
+		}
 		glTexSubImage2D(target, level, xoffset, yoffset, width, height, format, type, data);
+		if (pitch) {
+			glPixelStorei(GL_UNPACK_ROW_LENGTH, orig_row_len);
+			glPixelStorei(GL_UNPACK_ALIGNMENT, orig_pix_align);
+		}
 		return;
 	}
 	/* Else we are defining the storage for the texture and more things need considered.
 	 * Also the texture object should be updated with the result of the calculations below. */
 	
-	known_format= _get_format_info(format, NULL, &has_alpha, &default_internal_fmt);
 	if (internal_p) internal_fmt= SvIV(internal_p);
 	else if (known_format) internal_fmt= default_internal_fmt;
 	else carp_croak("No default internal_format for given format %d; must be specified", format);
@@ -247,7 +278,15 @@ void _texture_load(HV *self, int level, int xoffset, int yoffset, int width, int
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
 	}
+	if (pitch) {
+		glPixelStorei(GL_UNPACK_ROW_LENGTH, row_len);
+		glPixelStorei(GL_UNPACK_ALIGNMENT, pix_align);
+	}
 	glTexImage2D(target, level, internal_fmt, width, height, 0, format, type, data);
+	if (pitch) {
+		glPixelStorei(GL_UNPACK_ROW_LENGTH, orig_row_len);
+		glPixelStorei(GL_UNPACK_ALIGNMENT, orig_pix_align);
+	}
 	if (with_mipmaps && major >= 3) {
 		/* glEnable(GL_TEXTURE_2D);  correct bug in ATI, accoridng to Khronos FAQ */
 		glGenerateMipmap(GL_TEXTURE_2D);

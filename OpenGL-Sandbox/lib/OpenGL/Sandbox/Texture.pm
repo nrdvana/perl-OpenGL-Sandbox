@@ -219,6 +219,14 @@ space for the texture without loading any data into it.  However, if there is a 
 Object currently bound to C<GL_PIXEL_UNPACK_BUFFER> then this I<may not> be a ref, and must
 be either undef (0) or a numeric value, since it gets interpreted as an offset.
 
+=item pitch
+
+A number of bytes between one row of image data and the next.  Note that OpenGL doesn't support
+arbitrary pitch values - it must be a multiple of the pixel size rounded up to one of the
+standard alignments.  If you pass in a pitch value that doesn't work, this function dies.
+The values of C<GL_UNPACK_ALIGNMENT> and C<GL_UNPACK_ROW_LENGTH> will be returned to their
+original value afterward.  They will not be changed at all if you don't specify a pitch.
+
 =back
 
 Returns C<$self> for convenient chaining.
@@ -253,10 +261,11 @@ sub load {
 		my $format= delete $opts{format} // GL_RGB;
 		my $type= delete $opts{type} // GL_UNSIGNED_BYTE;
 		my $data= delete $opts{data};
-		croak "Unknown options to ->load(): ".join(', ', keys %opts)
+		my $pitch= delete $opts{pitch} // 0;
+		carp "Unknown options to ->load(): ".join(', ', keys %opts)
 			if keys %opts;
 		$self->tx_id; # make sure initialized
-		$self->OpenGL::Sandbox::_texture_load($level, $xoffset, $yoffset, $width, $height, $format, $type, $data);
+		$self->OpenGL::Sandbox::_texture_load($level, $xoffset, $yoffset, $width, $height, $format, $type, $data, $pitch);
 		# that call automatically sets ->width and ->height and ->internal_format and ->loaded(1)
 	}
 	$self;
@@ -281,7 +290,7 @@ sub load_rgb {
 	my $mmap= OpenGL::Sandbox::MMap->new($fname);
 	my ($dim, $has_alpha)= _from_pow2_filesize($fname, $mmap);
 	$self->tx_id; # make sure it is built
-	$self->OpenGL::Sandbox::_texture_load(0, 0, 0, $dim, $dim, $has_alpha? GL_RGBA : GL_RGB, GL_UNSIGNED_BYTE, $mmap);
+	$self->OpenGL::Sandbox::_texture_load(0, 0, 0, $dim, $dim, $has_alpha? GL_RGBA : GL_RGB, GL_UNSIGNED_BYTE, $mmap, 0);
 	return $self;
 }
 sub load_bgr {
@@ -289,7 +298,7 @@ sub load_bgr {
 	my $mmap= OpenGL::Sandbox::MMap->new($fname);
 	my ($dim, $has_alpha)= _from_pow2_filesize($fname, $mmap);
 	$self->tx_id; # make sure it is built
-	$self->OpenGL::Sandbox::_texture_load(0, 0, 0, $dim, $dim, $has_alpha? GL_BGRA : GL_BGR, GL_UNSIGNED_BYTE, $mmap);
+	$self->OpenGL::Sandbox::_texture_load(0, 0, 0, $dim, $dim, $has_alpha? GL_BGRA : GL_BGR, GL_UNSIGNED_BYTE, $mmap, 0);
 	return $self;
 }
 
@@ -327,7 +336,7 @@ sub load_png {
 	my $use_bgr= 1; # TODO: check OpenGL for optimal format
 	my ($imgref, $w, $h, $dim, $format)= _load_png_data_and_rescale($fname, $use_bgr);
 	$self->tx_id; # make sure it is built
-	$self->OpenGL::Sandbox::_texture_load(0, 0, 0, $dim, $dim, $format, GL_UNSIGNED_BYTE, $imgref);
+	$self->OpenGL::Sandbox::_texture_load(0, 0, 0, $dim, $dim, $format, GL_UNSIGNED_BYTE, $imgref, 0);
 	$self->src_width($w);
 	$self->src_height($h);
 	return $self;
