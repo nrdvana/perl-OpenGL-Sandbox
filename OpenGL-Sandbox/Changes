@@ -9,7 +9,8 @@ Version 0.049_002 - 2019-02-04
      - standardized pattern of new_X() vs. load_X() vs. X()
      - configurable via OpenGL::Sandbox -resources => {}
   - Textures can now load arbitrary data, including from PBOs
-  - Fix RGB/BGR texture loading bug in PNG loader
+  - No more automatic power-of-two scaling in PNG loader
+  - Removed dependency on LibAV swscale
   - Shadertoy-compatible fragment shader demo script
 
 Version 0.042 - 2019-01-09
