@@ -333,46 +333,6 @@ intptr_t _get_scalarref_pv(SV *sv) {
 	return (intptr_t) SCALAR_REF_DATA(sv);
 }
 
-SV* _img_rescale_to_pow2_square(int width, int height, int has_alpha, int want_bgr, SV *sref) {
-	struct SwsContext *sws= NULL;
-	SV *ret= NULL;
-	void *data= SCALAR_REF_DATA(sref);
-	size_t len= SCALAR_REF_LEN(sref);
-	int px_size= has_alpha? 4 : 3;
-	int dim= _round_up_pow2(width > height? width : height);
-	const uint8_t *src_planes[4]= { data,0,0,0 };
-	int src_stride[4]= { width*px_size,0,0,0 };
-	uint8_t *dst_planes[4]= { 0,0,0,0 };
-	int dst_stride[4]= { dim*px_size,0,0,0 };
-	
-	if (!data || !len)
-		carp_croak("Expected non-empty scalar-ref pixel buffer");
-	if ((size_t)width * height * px_size != len)
-		carp_croak("Size of scalar ref disagrees with rectangle dimensions: %d * %d * %d != %ld",
-			width, height, px_size, len);
-	
-	/* rescale to square */
-	sws= sws_getCachedContext(sws, width, height, has_alpha? AV_PIX_FMT_RGBA : AV_PIX_FMT_RGB24,
-		dim, dim, want_bgr? (has_alpha? AV_PIX_FMT_BGRA : AV_PIX_FMT_BGR24) : (has_alpha? AV_PIX_FMT_RGBA : AV_PIX_FMT_RGB24),
-		SWS_BICUBIC, NULL, NULL, NULL);
-	if (!sws)
-		carp_croak("can't initialize resize context");
-	
-	/* allocate a "mortal" scalar into which we write the new image */
-	ret= sv_2mortal(newSV(dim*dim*px_size));
-	sv_setpvn(ret, "", 0);
-	SvGROW(ret, dim*dim*px_size);
-	SvCUR_set(ret, dim*dim*px_size);
-	dst_planes[0]= (uint8_t*) SvPVX(ret);
-	
-	/* perform the rescale */
-	sws_scale(sws, src_planes, src_stride, 0, height, dst_planes, dst_stride);
-	sws_freeContext(sws);
-	
-	/* return a ref to the scalar, to avoid making a copy */
-	return newRV_inc(ret);
-}
-
 void _img_rgb_to_bgr(SV *sref, int has_alpha) {
 	char *p= SCALAR_REF_DATA(sref), *last, c;
 	int px_size= has_alpha? 4 : 3;

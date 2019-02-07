@@ -46,11 +46,11 @@ sub test_load_rgb {
 subtest load_png => \&test_load_png;
 sub test_load_png {
 	my @tests= (
-		[ '8x8.png', 8, 8, 8, 0, 8, 8 ],
-		[ '14x7-rgba.png', 16, 16, 16, 1, 14, 7 ]
+		[ '8x8.png', 8, 8, 0, 8, 8 ],
+		[ '14x7-rgba.png', 14, 7, 1, 14, 7 ]
 	);
 	for (@tests) {
-		my ($fname, $width, $height, $pow2, $has_alpha, $src_w, $src_h)= @$_;
+		my ($fname, $width, $height, $has_alpha, $src_w, $src_h)= @$_;
 		subtest $fname => sub {
 			my $tx= OpenGL::Sandbox::Texture->new(filename => "$datadir/tex/$fname")->load;
 			ok( !log_gl_errors, 'No GL errors' );
@@ -60,10 +60,13 @@ sub test_load_png {
 			is( $tx->src_width, $src_w, 'src_width' );
 			is( $tx->src_height, $src_h, 'src_height' );
 			
-			OpenGL::Sandbox::Texture::convert_png("$datadir/tex/$fname", "$tmp/$fname.rgb");
-			my $tx2= OpenGL::Sandbox::Texture->new(filename => "$tmp/$fname.rgb")->load;
-			ok( !log_gl_errors, 'No GL errors' );
-			is( $tx2->width, $tx->width, 'width after convert to rgb' );
+			if ($width == $height) {
+				OpenGL::Sandbox::Texture::convert_png("$datadir/tex/$fname", "$tmp/$fname.rgb");
+				my $tx2= OpenGL::Sandbox::Texture->new(filename => "$tmp/$fname.rgb")->load;
+				ok( !log_gl_errors, 'No GL errors' );
+				is( $tx2->$_, $tx->$_, "$_ after convert to rgb" )
+					for 'width', 'height';
+			}
 		};
 	}
 }

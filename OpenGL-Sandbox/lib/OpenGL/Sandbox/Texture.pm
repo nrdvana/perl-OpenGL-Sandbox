@@ -334,16 +334,16 @@ coordinates.  That could be a useful addition.
 sub load_png {
 	my ($self, $fname)= @_;
 	my $use_bgr= 1; # TODO: check OpenGL for optimal format
-	my ($imgref, $w, $h, $dim, $format)= _load_png_data_and_rescale($fname, $use_bgr);
 	$self->tx_id; # make sure it is built
-	$self->OpenGL::Sandbox::_texture_load(0, 0, 0, $dim, $dim, $format, GL_UNSIGNED_BYTE, $imgref, 0);
+	my ($w, $h, $fmt, $dataref)= _load_png_data($fname);
+	$self->OpenGL::Sandbox::_texture_load(0, 0, 0, $w, $h, $fmt, GL_UNSIGNED_BYTE, $dataref, 0);
 	$self->src_width($w);
 	$self->src_height($h);
 	return $self;
 }
 
-sub _load_png_data_and_rescale {
-	my ($fname, $use_bgr)= @_;
+sub _load_png_data {
+	my ($fname)= @_;
 	require Image::PNG::Libpng;
 	
 	# Load PNG format, or die
@@ -362,24 +362,13 @@ sub _load_png_data_and_rescale {
 	$bit_depth == 8
 		or croak "$fname must be encoded with 8-bit color channels";
 	
-	# Get the row data and scale it to a square if needed.
 	# PNG data is stored top-to-bottom, but OpenGL considers 0,0 the lower left corner.
 	my $dataref= \join('', reverse @{ $png->get_rows });
 	# Should have exactly the number of bytes for pixels, no extra padding or alignment
 	length($$dataref) == ($has_alpha? 4 : 3) * $width * $height
 		or croak sprintf "$fname does not contain the expected number of data bytes (%d != %d * %d * %d)",
 			length($$dataref), $has_alpha? 4:3, $width, $height;
-	# Result is a ref to a scalar, to avoid copying.  swscale can swap bytes to the preferred order.
-	my $dim= OpenGL::Sandbox::_round_up_pow2($width);
-	my $format;
-	if ($width == $dim && $height == $dim) {
-		# no need to scale, and we use RGB byte order and let glTexImage2D swap it.
-		$format= $has_alpha? GL_RGBA : GL_RGB;
-	} else {
-		$dataref= OpenGL::Sandbox::_img_rescale_to_pow2_square($width, $height, $has_alpha, $use_bgr? 1 : 0, $dataref);
-		$format= $use_bgr? ($has_alpha? GL_BGRA : GL_BGR) : ($has_alpha? GL_RGBA : GL_RGB);
-	}
-	return $dataref, $width, $height, $dim, $format;
+	return $width, $height, ($has_alpha? GL_RGBA : GL_RGB), $dataref;
 }
 
 =head2 TODO: load_ktx
@@ -465,8 +454,8 @@ This does not require an OpenGL context.
 
 sub convert_png {
 	my ($src, $dst)= @_;
-	my $use_bgr= $dst =~ /\.bgr$/? 1 : 0;
-	my ($dataref)= _load_png_data_and_rescale($src, $use_bgr);
+	my ($w, $h, $fmt, $dataref)= _load_png_data($src);
+	OpenGL::Sandbox::_img_rgb_to_bgr($dataref, ($fmt == GL_RGBA? 1 : 0)) if $dst =~ /\.bgr$/;
 	open my $dst_fh, '>', $dst or croak "open($dst): $!";
 	binmode $dst_fh;
 	print $dst_fh $$dataref;

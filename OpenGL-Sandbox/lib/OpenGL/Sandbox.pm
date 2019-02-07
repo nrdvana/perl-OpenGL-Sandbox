@@ -537,10 +537,6 @@ libGL, and headers
 
 =item *
 
-LibAV libraries libswscale, libavutil, and headers, for the feature that automatically rescales textures
-
-=item *
-
 L<Image::PNG::Libpng>, for the feature that automatically loads PNG.
 
 =item *

@@ -12,15 +12,6 @@ static void carp_croak_sv(SV* value) {
 
 #include <GL/gl.h>
 #include <GL/glext.h>
-#include <libavutil/avutil.h>
-#include <libavutil/pixfmt.h>
-#include <libswscale/swscale.h>
-#if LIBAVUTIL_VERSION_MAJOR < 54
-#define AV_PIX_FMT_RGBA PIX_FMT_RGBA
-#define AV_PIX_FMT_RGB24 PIX_FMT_RGB24
-#define AV_PIX_FMT_BGRA PIX_FMT_BGRA
-#define AV_PIX_FMT_BGR24 PIX_FMT_BGR24
-#endif
 
 /* Don't want to get into the whole GLEW stuff, but these don't seem to be in gl.h...
  * Shouldn't hurt to include them as long as all access is guarded by #ifdef GL_VERSION_
