@@ -438,11 +438,14 @@ sub warn_gl_errors {
 use Devel::CheckOS 'os_is';
 use OpenGL::Sandbox::Inline do {
 	my ($vol, $dir)= splitpath(__FILE__);
+	my $src= abs_path(catpath($vol, $dir, 'Sandbox.c'));
 	my $libs= os_is('MSWin32')? '-lopengl32 -lgdi32 -lmsimg32' : '-lGL';
 	my $src_dir= abs_path(catpath($vol, $dir));
-	$src_dir= qq{"$src_dir"} if os_is('MSWin32');
+	# Inline::C can take a file path, but it mistakes Win32 absolute paths for C code,
+	# so just slurp the file directly.
+	$src= do { local $/= undef; open my $fh, '<', $src; <$fh> } if os_is('MSWin32');
 	
-	C => abs_path(catpath($vol, $dir, 'Sandbox.c')),
+	C => $src,
 	INC => '-I'.$src_dir,
 	#CCFLAGSEX => '-Wall -g3 -Os'
 	LIBS => $libs;

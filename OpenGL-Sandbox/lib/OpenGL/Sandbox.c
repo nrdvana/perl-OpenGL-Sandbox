@@ -258,7 +258,7 @@ void _texture_load(HV *self, int level, int xoffset, int yoffset, int width, int
 	with_mipmaps= level? 0
 		: mipmap_p? SvTRUE(mipmap_p)
 		: !min_filter_p? 1
-		: SvIV(min_filter_p) == GL_NEAREST || SvIV(min_filter_p) == GL_LINEAR ? 0
+		: (SvIV(min_filter_p) == GL_NEAREST || SvIV(min_filter_p) == GL_LINEAR) ? 0
 		: 1;
 	
 	if (with_mipmaps) {

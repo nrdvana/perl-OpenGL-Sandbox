@@ -135,6 +135,7 @@ SV *_fetch_if_defined(HV *self, const char *field, int len) {
 
 void _get_buffer_from_sv(SV *s, char **data, unsigned long *size) {
 	dSP;
+	STRLEN len;
 	if (!s || !SvOK(s)) carp_croak("Data is undefined");
 	if (sv_isa(s, "OpenGL::Array")) {
 		/* OpenGL::Array has an internal struct and the only way to correctly
@@ -172,7 +173,8 @@ void _get_buffer_from_sv(SV *s, char **data, unsigned long *size) {
 		*size= SCALAR_REF_LEN(s);
 	}
 	else if (SvPOK(s)) {
-		*data= SvPV(s, (*size));
+		*data= SvPV(s, len);
+		*size= len;
 	}
 	else
 		carp_croak("Don't know how to get data buffer from %s", SvPV_nolen(s));
