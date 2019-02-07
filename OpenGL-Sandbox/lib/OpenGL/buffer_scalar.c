@@ -175,7 +175,8 @@ extern void buffer_scalar_wrap(
 	info->address= address;
 	info->length= length;
 	info->flags= flags;
-	memcpy(info->callback_data, cbdata, sizeof(buffer_scalar_callback_data_t));
+	if (cbdata)
+		memcpy(info->callback_data, cbdata, sizeof(buffer_scalar_callback_data_t));
 	info->destructor= destructor;
 	reset_var(target, info);
 }

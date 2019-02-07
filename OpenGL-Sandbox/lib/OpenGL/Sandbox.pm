@@ -2,7 +2,7 @@ package OpenGL::Sandbox;
 use v5.14; # I can aim for older upon request.  Not expecting any requests though.
 use Exporter::Extensible -exporter_setup => 1;
 use Try::Tiny;
-use File::Spec::Functions 'catpath','splitpath';
+use File::Spec::Functions qw/ catpath splitpath catdir splitdir /;
 use Cwd 'abs_path';
 use Carp;
 use Log::Any '$log';
@@ -437,16 +437,15 @@ sub warn_gl_errors {
 # Pull in the C file and make sure it has all the C libs available
 use Devel::CheckOS 'os_is';
 use OpenGL::Sandbox::Inline do {
-	my ($vol, $dir)= splitpath(__FILE__);
-	my $src= abs_path(catpath($vol, $dir, 'Sandbox.c'));
+	my $src_dir= abs_path(catpath( (splitpath(__FILE__))[0,1] ));
+	my $src= catdir($src_dir, 'Sandbox.c');
 	my $libs= os_is('MSWin32')? '-lopengl32 -lgdi32 -lmsimg32' : '-lGL';
-	my $src_dir= abs_path(catpath($vol, $dir));
 	# Inline::C can take a file path, but it mistakes Win32 absolute paths for C code,
 	# so just slurp the file directly.
 	$src= do { local $/= undef; open my $fh, '<', $src; <$fh> } if os_is('MSWin32');
 	
 	C => $src,
-	INC => '-I'.$src_dir,
+	INC => '-I'.$src_dir.' -I'.catdir($src_dir, qw( .. .. inc )),
 	#CCFLAGSEX => '-Wall -g3 -Os'
 	LIBS => $libs;
 };
