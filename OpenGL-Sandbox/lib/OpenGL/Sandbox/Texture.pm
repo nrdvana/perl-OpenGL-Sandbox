@@ -38,11 +38,11 @@ you load yourself via calls to glTexImage or glTexSubImage.
 
 =head2 src_width
 
-Original width of the texture before it might have been rescaled to a square power of two.
+Original width of the image independent of whether it got stored in a power-of-two texture.
 
 =head2 src_height
 
-Original height of the texture before it might have been rescaled to a square power of two.
+Original height of the image independent of whether it got stored in a power-of-two texture.
 
 =head2 tx_id
 
@@ -78,11 +78,12 @@ mipmaps will be automatically generated.
 =head2 min_filter
 
 Value for GL_TEXTURE_MIN_FILTER.  Setting does not take effect until L</loaded>, but after that
-a change to this attribute takes effect immediately causing the texture to be bound.
+a change to this attribute takes effect immediately, causing the texture to be bound in the
+process.  Change with care.
 
-=head2 max_filter
+=head2 mag_filter
 
-Value for GL_TEXTURE_MAX_FILTER.  See notes on L</min_filter>.
+Value for GL_TEXTURE_MAG_FILTER.  See notes on L</min_filter>.
 
 =head2 wrap_s
 
@@ -321,13 +322,8 @@ sub _from_pow2_filesize {
 
 =head2 load_png
 
-Load image data from a PNG file.  The file is read and decoded, and if it is a
-square power of two dimension, it is loaded directly.  If it is rectangular, it
-gets stretched out to the next power of two square, using libswscale.
-
-This library currently has no provision for the OpenGL "rectangular texture"
-extension that allows for actual rectangular images and positive integer texture
-coordinates.  That could be a useful addition.
+Load image data from a PNG file.  The PNG must be internally encoded as RGB or RGBA,
+and the presence or absence of alpha channel will be carried over to the texture.
 
 =cut
 
@@ -446,8 +442,8 @@ sub render {
 
   convert_png("foo.png", "foo.rgb");
 
-Read a C<.png> file and write an C<.rgb> (or C<.bgr>) file.  The C<.png> will be scaled to a
-square power of 2 if it is not already.  The pixel format of the PNG must be C<RGB> or C<RGBA>.
+Read a C<.png> file and write an C<.rgb> (or C<.bgr>) file.
+The pixel format of the PNG must be C<RGB> or C<RGBA>.
 This does not require an OpenGL context.
 
 =cut

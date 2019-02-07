@@ -33,11 +33,97 @@ this library as low as possible.
 Note that you need to install L<OpenGL::Sandbox::V1::FTGLFont> in order to get font support,
 currently.  Other font providers might be added later.
 
-=head1 ATTRIBUTES
+=head1 METHODS
 
-=head2 path
+=head2 new
 
-The path where resources are located, adhering to the basic layout of:
+Standard Moo constructor.  All attributes may be initialized here.
+
+=head2 default_instance
+
+Return a global instance which uses the current directory as "path".
+
+=cut
+
+our $_default_instance;
+sub default_instance {
+	$_default_instance ||= __PACKAGE__->new(path => ".");
+}
+END { $_default_instance->clear_cache if $_default_instance }
+
+sub BUILD {
+	my $self= shift;
+	$log->debug("OpenGL::Sandbox::ResMan loaded");
+}
+
+=head2 clear_cache
+
+Call this method to remove all current references to any resource.  If this was the last
+reference to those resources, it will also garbage collect any OpenGL resources that had been
+allocated.  The next access to any font or texture will re-load the resource from disk.
+Any manually-created named resources (that didn't come from disk or config) must be re-created.
+
+=cut
+
+sub clear_cache {
+	my $self= shift;
+	%{ $self->_mmap_cache }= ();
+	%{ $self->_texture_cache }= ();
+	$self->_clear_texture_dir_cache;
+	$self->_clear_buffer_cache;
+	$self->_clear_data_dir_cache;
+	$self->_clear_vao_cache;
+	$self->_clear_shader_cache;
+	$self->_clear_shader_dir_cache;
+	$self->_clear_program_cache;
+	$self->_clear_font_cache;
+	$self->_clear_font_dir_cache;
+}
+
+sub _cache_directory {
+	my ($self, $path, $extension_priority)= @_;
+	my %names;
+	File::Find::find({ no_chdir => 1, wanted => sub {
+		return if -d $_; # ignore directories
+		my $full_path= $File::Find::name;
+		(my $rel_name= substr($full_path, length($File::Find::dir))) =~ s,^[\\/],,;
+		# If it's a symlink, get the real filename
+		if (-l $full_path) {
+			$full_path= readlink $full_path;
+			$full_path= canonpath(catdir($File::Find::dir, $full_path))
+				unless file_name_is_absolute($full_path);
+		}
+		# Decide on the friendly name which becomes the key in the hash
+		# (but the whole filename always becomes a key in the hash as well)
+		(my $short_name= $rel_name) =~ s/\.\w+$//;
+		# If there is a conflict for the short key...
+		if ($names{$short_name}) {
+			# If extension priority available, use that.  Else first in wins.
+			if (!$extension_priority) {
+				$short_name= $rel_name;
+			} else {
+				my ($this_ext)= ($full_path =~ /\.(\w+)$/);
+				my ($prev_ext)= ($names{$short_name}[1] =~ /\.(\w+)$/);
+				($extension_priority->{$this_ext//''}//999) < ($extension_priority->{$prev_ext//''}//999)
+					or ($short_name= $rel_name);
+			}
+		}
+		# Stat, for device/inode.  But if stat fails, warn and skip it.
+		if (my ($dev, $inode)= stat $full_path) {
+			$names{$rel_name}= $names{$short_name}= [ "($dev,$inode)", $full_path ];
+		}
+		else {
+			$log->warn("Can't stat $full_path: $!");
+		}
+	}}, $path) if -d $path;
+	\%names;
+}
+
+=head1 CONFIGURATION
+
+=head1 Resouce Paths
+
+The default file layout assumed by this module is a tree that looks like
 
   ./tex/          # textures
   ./tex/default   # file or symlink for default texture.  Required.
@@ -49,6 +135,10 @@ The path where resources are located, adhering to the basic layout of:
 You can override these implied sub-paths with the following attributes:
 
 =over 18
+
+=item path
+
+Root path for all other path fragments
 
 =item texture_path
 
@@ -67,53 +157,91 @@ You can override these implied sub-paths with the following attributes:
 A plain string is interpreted as relative to C<path>; an absolute path or path beginning
 with C<"."> is used as-is.  An empty string means it is identical to C<path>.
 
-=head2 C<*_config>
+  path => '/opt/myapp/resources',  # absolute path
+  tex_path => 'tex',               # resolves as "/opt/myapp/resources/tex"
+  tex_path => '',                  # resolves as "/opt/myapp/resources"
+  tex_path => './tex',             # resolves as getcwd()."/tex"
+  tex_path => '/tmp/foo',          # absolute path
 
-Each type of resource managed by this object can be pre-configured.  Each config attribute
-is a hashref where the keys match the named of the created resources.  Each config may also
-include a key C<'*'> which applies settings to every created resource.
+=head1 Per-Resource Config
+
+For each type of resource managed by this object, there is a C<config_*> attribute which takes
+a hashref of configuration.  Each named resource is configured by the matching entry in this
+hash at the time it is first used.  Each config hash may also contain an element C<'*'> which
+applies default configuration to every resource of this type.
+
+  texture_config => {
+    'ResourceName' => ...,
+    '*' => ...
+  }
 
 The values of the config are usually hashrefs of constructor arguments that get shallow-merged
 with arguments you pass to C<new_*>, but may also be plain scalars indicating that this resource
 is an alias for some other name.
 
-Several configurations also expect an entry for 'default', which gets returned on any request
-for a missing resource.
+  'Resource1' => { ... },     # default constructor arguments for Resource1
+  'Resource2' => 'Resource1', # Resource2 is an alias for Resurce1 
 
-The namespace of each type of resource is independent.
+Several resource types also expect an entry for C<'default'>, which gets returned on any
+request for a missing resource.
+
+The namespace of each type of resource is independent.  i.e. it is fine to have both a texture
+named "Foo" and a buffer named "Foo".
 
 =over
 
 =item texture_config
 
-Configuration for L</new_tex>, constructing L<OpenGL::Sandbox::Texture>.
+Configuration for L</new_texture>, constructing L<OpenGL::Sandbox::Texture>.
 
 Example texture_config:
 
   {
-    '*'     => { wrap_s => GL_CLAMP,  wrap_t => GL_CLAMP  },
-    default => { filename => 'foo.png' }, # texture named "default"
+    '*'     => { wrap_s => GL_CLAMP,  wrap_t => GL_CLAMP  }, # default settings
+    default => { filename => 'foo.png' },                    # texture named "default"
     tile1   => { wrap_s => GL_REPEAT, wrap_t => GL_REPEAT },
     blocky  => { mag_filter => GL_NEAREST },
     alias1  => 'tile1',
   }
 
-Textures can also be implied by a file in the L</tex_path> directory.
+Existence of images in the texture directory implies default entries in this config.
+For example, if you have
+
+  tex/a.png
+  tex/b.rgb
+  tex/c.bgr
+
+it has the implied effect of
+
+  {
+    a => { filename => 'a.png' },
+    b => { filename => 'b.rgb' },
+    c => { filename => 'c.bgr' },
+  }
+
+in addition to whatever other settings you supplied for that name.
 
 =item tex_config
 
 Alias for C<texture_config>
+
+=item tex_fmt_priority
+
+If you have texture files with the same base name and different extensions (such as original
+image formats and derived ".png" or ".rgb") this resolves which image file you want to load
+automatically for C<tex("basename")>.  Default is to load ".bgr", else ".rgb", else ".png"
 
 =item buffer_config
 
 Configuration for L</new_buffer>, constructing L<OpenGL::Sandbox::Buffer>.
 
   {
-    '*' => { type => GL_VERTEX_ARRAY },
+    '*'           => { type => GL_VERTEX_ARRAY },
     triangle_data => { data => pack('f*', 1,1, 2,1, 2,-1, ...) }
   }
 
-Buffers can also be implied by a file in the L</data_path> directory.
+Buffer filenames can also be implied by a file in the L</data_path> directory, per the same
+rules described in L</texture_config>.
 
 =item vertex_array_config
 
@@ -137,23 +265,26 @@ Alias for C<vertex_array_config>
 Configuration for L</new_shader>, constructing L<OpenGL::Sandbox::Shader>.
 
   {
-    '*' => { type => GL_FRAGMENT_SHADER },
-    aurora => { filename => 'aurora.frag' },
-    vpassthrough => { filename => 'vertex-passthrough.vert', type => GL_VERTEX_SHADER },
+    '*'          => { type => GL_FRAGMENT_SHADER },
+    aurora       => { filename => 'aurora.frag' },
+    vpassthrough => { filename => 'vtx-pass.vert', type => GL_VERTEX_SHADER },
   }
 
-Shaders are also implied by the presence of a file in the L</shader_path> directory.
+Shaders are also implied by the presence of a file in the L</shader_path> directory,
+per the same rules described in L</texture_config>.
 
 =item program_config
 
 Configuration for L</new_program>, constructing L<OpenGL::Sandbox::Program>.
 
   {
-    '*' => { shaders => { vertex => 'vpassthrough', fragment => 'aurora' } },
+    '*'    => { shaders => { vertex => 'vpassthrough', fragment => 'aurora' } },
     'demo' => { attr => { ... }, shaders => { vertex => 'special_vshader' } },
   }
 
-Programs are also implied by the presence shaders of the same name prefix.
+Programs are also implied by the presence shaders of the same name prefix.  i.e. if you have
+shaders named C<"a.frag"> and C<"a.vert">, then it implies the existence of a program named
+C<"a"> composed of those shaders.
 
 =item font_config
 
@@ -166,15 +297,10 @@ Configures L<OpenGL::Sandbox::V1::FTGLFont>.  (distributed separately)
     myfont2 => 'myfont1',  # alias
   }
 
-Fonts are also implied by the presence of a file in the L</font_path> directory.
+Fonts are also implied by the presence of a file in the L</font_path> directory,
+per the same rules described in L</texture_config>.
 
 =back
-
-=head2 tex_fmt_priority
-
-If you have texture files with the same base name and different extensions (such as original
-image formats and derived ".png" or ".rgb") this resolves which image file you want to load
-automatically for C<tex("basename")>.  Default is to load ".bgr", else ".rgb", else ".png"
 
 =cut
 
@@ -275,34 +401,14 @@ sub _get_cached_mmap {
 	$mmap;
 }
 
-=head1 METHODS
+=head1 RESOURCE ACCESS
 
-=head2 new
+=head2 Textures
 
-Standard Moo constructor.
-
-=head2 default_instance
-
-Return a default instance which uses the current directory as "path".
-
-=cut
-
-our $_default_instance;
-sub default_instance {
-	$_default_instance ||= __PACKAGE__->new(path => ".");
-}
-END { $_default_instance->clear_cache if $_default_instance }
-
-sub BUILD {
-	my $self= shift;
-	$log->debug("OpenGL::Sandbox::ResMan loaded");
-}
-
-=head2 texture, tex, load_texture, new_texture
-
-  my $tex= $res->tex( $name ); # handy alias
   my $tex= $res->texture( $name );
-  my $tex= $res->load_texture( $name, %options );
+  my $tex= $res->tex( $name );     # handy alias
+  my $tex= $res->load_texture( $name, %options ); # load from file
+  my $tex= $res->new_texture( $name, %options );  # file not needed
 
 Get a texture object.  Textures can be configured, or implied by presence of image files in
 L</tex_path>, or both.
@@ -378,7 +484,7 @@ sub new_texture {
 	}
 }
 
-=head2 buffer, new_buffer
+=head2 Buffer Objects
 
   my $buffer= $res->buffer( $name );
   my $buffer= $res->new_buffer( $name, %options );
@@ -425,9 +531,10 @@ sub new_buffer {
 	}
 }
 
-=head2 vao, vertex_array, new_vao, new_vertex_array
+=head2 Vertex Arrays
 
-  my $vertex_array= $res->vao( $name );
+  my $vertex_array= $res->vertex_array( $name );
+  my $vertex_array= $res->vao( $name );          # handy alias
   my $vertex_array= $res->new_vao( $name, %options );
 
 Return an existing or configured L<OpenGL::Sandbox::VertexArray|Vertex Array>.
@@ -483,7 +590,7 @@ sub new_vertex_array {
 }
 *new_vao= *new_vertex_array;
 
-=head2 shader, new_shader
+=head2 Shaders
 
   my $shader= $res->shader( $name );
   my $shader= $res->new_shader( $name, %options );
@@ -529,7 +636,7 @@ sub new_shader {
 	}
 }
 
-=head2 program, new_program
+=head2 Programs
 
   my $prog= $res->program( $name );
   my $prog= $res->new_program( $name, %options );
@@ -604,9 +711,18 @@ sub new_program {
 	}
 }
 
-=head2 font
+=head2 Fonts
 
   $font= $res->font( $name );
+  $font= $res->load_font( $name, %config );
+
+Font support comes from a separate distribution, and these methods with attempt to load it on
+demand.  Currently, the only font provider is L<OpenGL::Sandbox::V1::FTGLFont> which is tied to
+OpenGL 1.x.
+
+=over
+
+=item font
 
 Retrieve a named font, either confgured in L<font_config>, previously created, or implied by
 the presence of a file in L</font_path>.
@@ -615,21 +731,7 @@ If the font cannot be loaded, this logs a warning and returns the 'default'
 font rather than throwing an exception or returning undef.  If there is no font named
 'default', it dies instead.
 
-=cut
-
-sub font {
-	my ($self, $name)= @_;
-	$self->_font_cache->{$name} ||=
-		( try { $self->load_font($name) }
-		  catch { chomp(my $err= "Font '$name': $_"); $log->error($err); undef; }
-		)
-		|| ($name ne 'default' && try { $self->font('default') } )
-		|| croak "No font '$name' and no 'default'";
-}
-
-=head2 new_font
-
-  $font= $res->load_font( $name, %config );
+=item new_font
 
 Load a font by name.  By default, a font file of the same name is loaded as a
 TextureFont and rendered at 24px.  If multiple named fonts reference the same
@@ -642,7 +744,19 @@ If the font can't be loaded, this throws an exception.  If the named font has
 already been loaded, this will return the existing font, even if the options
 have changed.
 
+=back
+
 =cut
+
+sub font {
+	my ($self, $name)= @_;
+	$self->_font_cache->{$name} ||=
+		( try { $self->load_font($name) }
+		  catch { chomp(my $err= "Font '$name': $_"); $log->error($err); undef; }
+		)
+		|| ($name ne 'default' && try { $self->font('default') } )
+		|| croak "No font '$name' and no 'default'";
+}
 
 *load_font= *new_font;
 sub new_font {
@@ -675,68 +789,6 @@ sub load_fontdata {
 	my $file_info= $self->_font_dir_cache->{$filename}
 		or croak "No such font source '$filename'";
 	$self->_get_cached_mmap($file_info);
-}
-
-=head2 clear_cache
-
-Call this method to remove all current references to any resource.  If this was the last
-reference to those resources, it will also garbage collect any OpenGL resources that had been
-allocated.  The next access to any font or texture will re-load the resource from disk.
-
-=cut
-
-sub clear_cache {
-	my $self= shift;
-	%{ $self->_mmap_cache }= ();
-	%{ $self->_texture_cache }= ();
-	$self->_clear_texture_dir_cache;
-	$self->_clear_buffer_cache;
-	$self->_clear_data_dir_cache;
-	$self->_clear_vao_cache;
-	$self->_clear_shader_cache;
-	$self->_clear_shader_dir_cache;
-	$self->_clear_program_cache;
-	$self->_clear_font_cache;
-	$self->_clear_font_dir_cache;
-}
-
-sub _cache_directory {
-	my ($self, $path, $extension_priority)= @_;
-	my %names;
-	File::Find::find({ no_chdir => 1, wanted => sub {
-		return if -d $_; # ignore directories
-		my $full_path= $File::Find::name;
-		(my $rel_name= substr($full_path, length($File::Find::dir))) =~ s,^[\\/],,;
-		# If it's a symlink, get the real filename
-		if (-l $full_path) {
-			$full_path= readlink $full_path;
-			$full_path= canonpath(catdir($File::Find::dir, $full_path))
-				unless file_name_is_absolute($full_path);
-		}
-		# Decide on the friendly name which becomes the key in the hash
-		# (but the whole filename always becomes a key in the hash as well)
-		(my $short_name= $rel_name) =~ s/\.\w+$//;
-		# If there is a conflict for the short key...
-		if ($names{$short_name}) {
-			# If extension priority available, use that.  Else first in wins.
-			if (!$extension_priority) {
-				$short_name= $rel_name;
-			} else {
-				my ($this_ext)= ($full_path =~ /\.(\w+)$/);
-				my ($prev_ext)= ($names{$short_name}[1] =~ /\.(\w+)$/);
-				($extension_priority->{$this_ext//''}//999) < ($extension_priority->{$prev_ext//''}//999)
-					or ($short_name= $rel_name);
-			}
-		}
-		# Stat, for device/inode.  But if stat fails, warn and skip it.
-		if (my ($dev, $inode)= stat $full_path) {
-			$names{$rel_name}= $names{$short_name}= [ "($dev,$inode)", $full_path ];
-		}
-		else {
-			$log->warn("Can't stat $full_path: $!");
-		}
-	}}, $path) if -d $path;
-	\%names;
 }
 
 1;
