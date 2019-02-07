@@ -2,6 +2,7 @@ package OpenGL::Sandbox;
 use v5.14; # I can aim for older upon request.  Not expecting any requests though.
 use Exporter::Extensible -exporter_setup => 1;
 use Try::Tiny;
+use File::Spec::Functions 'catpath','splitpath';
 use Cwd 'abs_path';
 use Carp;
 use Log::Any '$log';
@@ -434,11 +435,18 @@ sub warn_gl_errors {
 }
 
 # Pull in the C file and make sure it has all the C libs available
-use OpenGL::Sandbox::Inline
-	C => do { my $x= __FILE__; $x =~ s|\.pm|\.c|; abs_path($x) },
-	INC => '-I'.do{ my $x= __FILE__; $x =~ s|/[^/]+$|/|; abs_path($x) }.' -I/usr/include/ffmpeg',
-	LIBS => '-lGL -lswscale',
-	CCFLAGSEX => '-Wall -g3 -Os';
+use Devel::CheckOS 'os_is';
+use OpenGL::Sandbox::Inline do {
+	my ($vol, $dir)= splitpath(__FILE__);
+	my $libs= os_is('MSWin32')? '-lopengl32 -lgdi32 -lmsimg32' : '-lGL';
+	my $src_dir= abs_path(catpath($vol, $dir));
+	$src_dir= qq{"$src_dir"} if os_is('MSWin32');
+	
+	C => abs_path(catpath($vol, $dir, 'Sandbox.c')),
+	INC => '-I'.$src_dir,
+	#CCFLAGSEX => '-Wall -g3 -Os'
+	LIBS => $libs;
+};
 
 =head2 Wrappers Around glGen*
 
