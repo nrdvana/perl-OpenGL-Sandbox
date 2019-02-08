@@ -304,12 +304,13 @@ BEGIN {
 		'OpenGL::GLFW'   => 'OpenGL::Sandbox::ContextShim::GLFW',
 		'SDL'            => 'OpenGL::Sandbox::ContextShim::SDL',
 		'SDLx::App'      => 'OpenGL::Sandbox::ContextShim::SDL',
+		'GLUT'           => 'OpenGL::Sandbox::ContextShim::GLUT',
 	);
 }
 
 our $current_context;
 sub make_context {
-	my (%opts)= @_;
+	my %opts= (@_ == 1 && ref $_[0] eq 'HASH')? %{ $_[0] } : @_;
 	# Check for geometry specification on command line
 	my ($geom_spec, $w,$h,$l,$t);
 	for (0..$#ARGV) {
@@ -328,22 +329,24 @@ sub make_context {
 		$opts{x} //= $l if defined $l;
 		$opts{y} //= $t if defined $t;
 	}
-	
+
 	# Load user's requested provider, or auto-detect first available
-	my $provider= $ENV{OPENGL_SANDBOX_CONTEXT_PROVIDER};
-	$provider //=
-		# Try X11 first, because lightest weight
-		eval('require X11::GLX::DWIM; 1;') ? 'GLX'
-		: eval('require OpenGL::GLFW; 1;') ? 'GLFW'
-		: eval('require SDLx::App; 1;') ? 'SDL'
-		: croak "make_context needs one of X11::GLX, OpenGL::GLFW, or SDLx::App to be installed";
-	
-	my $class= $context_provider_aliases{$provider}
-		or croak "Unhandled context provider $provider";
-	require_module($class);
-	
+	my $provider;
+	if ($ENV{OPENGL_SANDBOX_CONTEXT_PROVIDER}) {
+		$provider= $context_provider_aliases{$ENV{OPENGL_SANDBOX_CONTEXT_PROVIDER}}
+			or croak "Unhandled context provider $ENV{OPENGL_SANDBOX_CONTEXT_PROVIDER}";
+		require_module($provider);
+	}
+	else {
+		for my $mod (qw/ GLX GLFW SDL GLUT /) {
+			next unless eval "require OpenGL::Sandbox::ContextShim::$mod; 1";
+			$provider= "OpenGL::Sandbox::ContextShim::$mod";
+			last;
+		}
+	}
+
 	undef $current_context;
-	my $cx= $current_context= $class->new(%opts);
+	my $cx= $current_context= $provider->new(%opts);
 	$log->infof("Loaded %s", $cx->context_info);
 	weaken($current_context) if defined wantarray;
 	return $cx;
