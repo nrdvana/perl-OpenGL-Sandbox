@@ -80,6 +80,7 @@ while (1) {
 	next_frame;
 }
 
+# This declares the default resources for ResMan's shader(), program() etc. accessors.
 use OpenGL::Sandbox -resources => {
 	shader_config => {
 		xy_screen => { source => "
@@ -98,6 +99,10 @@ use OpenGL::Sandbox -resources => {
 		},
 	},
 };
+
+# The bit below adds compatibility for shaders from www.shadertoy.com
+# by defining any of the inputs that they lack, and wrapping mainImage()
+# with a simple main() implementation.
 
 my %provided_uniforms;
 BEGIN {

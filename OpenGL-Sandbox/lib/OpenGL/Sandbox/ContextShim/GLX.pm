@@ -15,6 +15,13 @@ sub new {
 	my %opts= ref $_[0] eq 'HASH'? %{$_[0]} : @_;
 	my $visible= $opts{visible} // 1;
 	my $glx= X11::GLX::DWIM->new();
+	if ($opts{fullscreen}) {
+		# TODO: X11::Xlib doesn't have access to the modern concept of screen yet, only the
+		#  idea of a screen that covers all physical monitors.  Need to add support for that.
+		my $screen= $glx->screen;
+		$opts{width}= $screen->width;
+		$opts{height}= $screen->height;
+	}
 	# Target is lazy.  Make sure GL context fully initialized before return.
 	if ($visible) {
 		$glx->target({ window => {

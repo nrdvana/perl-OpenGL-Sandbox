@@ -338,7 +338,7 @@ sub make_context {
 		require_module($provider);
 	}
 	else {
-		for my $mod (qw/ GLX GLFW SDL GLUT /) {
+		for my $mod (qw/ GLFW SDL GLX GLUT /) {
 			next unless eval "require OpenGL::Sandbox::ContextShim::$mod; 1";
 			$provider= "OpenGL::Sandbox::ContextShim::$mod";
 			last;
