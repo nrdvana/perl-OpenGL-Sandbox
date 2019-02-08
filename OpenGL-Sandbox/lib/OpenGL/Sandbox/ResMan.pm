@@ -537,7 +537,7 @@ sub new_buffer {
   my $vertex_array= $res->vao( $name );          # handy alias
   my $vertex_array= $res->new_vao( $name, %options );
 
-Return an existing or configured L<OpenGL::Sandbox::VertexArray|Vertex Array>.
+Return an existing or configured L<Vertex Array|OpenGL::Sandbox::VertexArray>.
 The configurations may reference Buffer objects by name, and these will be translated
 to the actual perl object with calls to L</buffer> before constructing the vertex array.
 
