@@ -1,9 +1,8 @@
 #! /usr/bin/env perl
 use strict;
 use warnings;
-use Log::Any::Adapter 'Daemontools', -init => { env => 1 };
 use Time::HiRes 'time';
-use File::Spec::Functions qw( splitpath );
+use Log::Any::Adapter 'Stderr', log_level => 'info';
 use OpenGL::Sandbox qw( :all GL_FLOAT GL_TRIANGLES GL_VERTEX_SHADER glDrawArrays $res );
 use Getopt::Long;
 use Pod::Usage;
@@ -23,7 +22,7 @@ and then renders shaders of your selection in a manner similar to www.shadertoy.
 =item --provider
 
 The module used to create the OpenGL context.  The default is to use the first working
-provider in the sequence of: GLX, GLFW, SDL, GLUT.
+provider in the sequence of: GLFW, SDL, GLX, GLUT.
 
 =item --fullscreen
 
@@ -41,6 +40,8 @@ Height of window
 
 Title of window
 
+=back
+
 =cut
 
 my %context_opts;
@@ -50,6 +51,7 @@ GetOptions(
 	'height=i'   => \$context_opts{height},
 	'title=s'    => \$context_opts{title},
 	'provider=s' => sub { $ENV{OPENGL_SANDBOX_CONTEXT_PROVIDER}= $_[1] },
+	'help'       => sub { pod2usage(1) },
 ) or pod2usage(2);
 @ARGV or pod2usage(-message => "Require at least one shader file");
 
@@ -71,7 +73,8 @@ $shaders{vert}= shader('xy_screen') unless grep { $_->type == GL_VERTEX_SHADER }
 
 my $prog= new_program('demo', shaders => \%shaders);
 $prog->bind;
-$prog->set("iResolution", 640, 480, 1.0) if $prog->uniforms->{iResolution};
+$prog->set("iResolution", $context_opts{width} // 640, $context_opts{height} // 480, 1.0)
+	if $prog->uniforms->{iResolution};
 vao('unit_quad')->bind;
 my $started= time;
 while (1) {
