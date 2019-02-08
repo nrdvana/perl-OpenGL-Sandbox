@@ -7,6 +7,10 @@ use OpenGL::Sandbox qw( :all GL_FLOAT GL_TRIANGLES GL_VERTEX_SHADER glDrawArrays
 use Getopt::Long;
 use Pod::Usage;
 
+# PODNAME: glsandbox-shaderdemo
+# ABSTRACT: Run shaders in a manner similar to www.shadertoy.com
+# VERSION
+
 =head1 SYNOPSIS
 
   glsandbox-shaderdemo [OPTIONS] SHADER_FILE [...]
