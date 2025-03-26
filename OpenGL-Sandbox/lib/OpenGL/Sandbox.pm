@@ -128,12 +128,12 @@ module's namespace.  i.e. C<< OpenGL::Sandbox::GL_TRUE() >> does not work.
 
 =head2 -V1
 
-Loads L<OpenGL::SandBox::V1> (which must be installed separately) and makes all its symbols
+Loads L<OpenGL::Sandbox::V1> (which must be installed separately) and makes all its symbols
 available for importing.  That module contains many "sugar" functions to make the
 GL 1.x API more friendly.  These aren't much use in modern OpenGL, and actually missing in
 various OpenGL implementations (like ES) so they are supplied as a separate dist.
 
-If L<OpenGL::SandBox::V1> is loaded, the C<:all> export will include everything from that
+If L<OpenGL::Sandbox::V1> is loaded, the C<:all> export will include everything from that
 module as well.
 
 =head2 :all
