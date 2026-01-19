@@ -248,7 +248,8 @@ sub font        { OpenGL::Sandbox::ResMan->default_instance->font(@_) }
   my $context= make_context( %opts );
 
 Pick the lightest smallest module that can get a window set up for rendering.
-This tries: L<X11::GLX>, L<OpenGL::GLFW>, and L<SDLx::App> in that order.
+This tries: L<X11::GLX>, L<OpenGL::GLFW>, L<SDLx::App>, and C<GLUT> (via OpenGL module)
+in that order.
 You can override the detection with environment variable C<OPENGL_SANDBOX_CONTEXT_PROVIDER>.
 It assumes you don't have any desire to receive user input and just want to render some stuff.
 If you do actually have a preference, you should just invoke that package yourself.

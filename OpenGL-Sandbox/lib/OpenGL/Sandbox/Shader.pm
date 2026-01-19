@@ -56,14 +56,14 @@ Optional - supply source code directly rather than loading from L</filename>.
 
 Type of shader, i.e. C<GL_FRAGMENT_SHADER>, C<GL_VERTEX_SHADER>, ...
 
-If you don't set this before lazy-building L</shader_id>, it will attempt to guess from the
+If you don't set this before lazy-building L</id>, it will attempt to guess from the
 C<filename>, and if it can't guess it will throw an exception.
 
 =head2 loader
 
 A method name or coderef of your choice for lazy-loading (and compiling) the code.
 If not set, the loader is determined from the L</filename> and if that is not set, nothing
-gets loaded on creation of the L<shader_id>.
+gets loaded on creation of the L</id>.
 
 Gets executed as C<< $shader->$loader($filename) >>.
 
@@ -106,7 +106,7 @@ Load shader source code into OpenGL.  This does not happen when the
 object is first constructed, in case the OpenGL context hasn't been initialized yet.
 It automatically happens when you use a program pipeline that is attached to the shader.
 
-Calls C<< $self->loader->($self, $self->filename) >>.  L</shader_id> will be a valid shader
+Calls C<< $self->loader->($self, $self->filename) >>.  L</id> will be a valid shader
 id after this (assuming the loader doesn't die).  The default loader also compiles the shader,
 and throws an exception if compilation fails.
 

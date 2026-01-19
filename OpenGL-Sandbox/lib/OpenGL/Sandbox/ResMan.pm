@@ -121,7 +121,7 @@ sub _cache_directory {
 
 =head1 CONFIGURATION
 
-=head1 Resouce Paths
+=head2 Resouce Paths
 
 The default file layout assumed by this module is a tree that looks like
 
@@ -163,7 +163,7 @@ with C<"."> is used as-is.  An empty string means it is identical to C<path>.
   tex_path => './tex',             # resolves as getcwd()."/tex"
   tex_path => '/tmp/foo',          # absolute path
 
-=head1 Per-Resource Config
+=head2 Per-Resource Config
 
 For each type of resource managed by this object, there is a C<config_*> attribute which takes
 a hashref of configuration.  Each named resource is configured by the matching entry in this
