@@ -2,7 +2,7 @@ package OpenGL::Sandbox::ContextShim::GLFW;
 use strict;
 use warnings;
 use Carp;
-use Scalar::Util 'weaken';
+use Scalar::Util qw/ refaddr weaken /;
 use OpenGL::GLFW qw/ glfwInit glfwGetVersionString glfwTerminate NULL GLFW_TRUE GLFW_FALSE
 	glfwGetPrimaryMonitor glfwCreateWindow glfwMakeContextCurrent glfwDestroyWindow
 	glfwSwapInterval glfwSwapBuffers glfwPollEvents
@@ -43,14 +43,14 @@ sub new {
 	glfwMakeContextCurrent($w);
 	glfwSwapInterval(1) if $opts{vsync} // 1;
 	
-	weaken($instances{$self}= $self);
+	weaken($instances{refaddr $self}= $self);
 	return $self;
 }
 
 sub DESTROY {
 	my $self= shift;
 	glfwDestroyWindow(delete $self->{window}) if defined $self->{window};
-	delete $instances{$self};
+	delete $instances{refaddr $self};
 }
 
 END {

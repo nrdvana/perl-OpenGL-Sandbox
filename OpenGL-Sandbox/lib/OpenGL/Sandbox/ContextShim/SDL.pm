@@ -2,7 +2,7 @@ package OpenGL::Sandbox::ContextShim::SDL;
 use strict;
 use warnings;
 use Carp;
-use Scalar::Util 'weaken';
+use Scalar::Util qw/ refaddr weaken /;
 use OpenGL::Sandbox qw/ glGetString GL_VERSION /;
 use SDLx::App;
 
@@ -33,8 +33,12 @@ sub new {
 		exit_on_quit => 1,
 	);
 	my $self= bless { sdl => $sdl }, $class;
-	weaken($instances{$self}= $self);
+	weaken($instances{refaddr $self}= $self);
 	return $self;
+}
+
+sub DESTROY {
+	delete $instances{refaddr $_[0]}
 }
 
 END {

@@ -2,7 +2,7 @@ package OpenGL::Sandbox::ContextShim::GLUT;
 use strict;
 use warnings;
 use Carp;
-use Scalar::Util 'weaken';
+use Scalar::Util qw/ refaddr weaken /;
 use OpenGL qw/ glutInit glutInitWindowSize glutInitWindowPosition glutInitDisplayMode
   glutCreateWindow glutDisplayFunc glutMainLoopEvent glutDestroyWindow glutSwapBuffers
   glutFullScreen
@@ -37,14 +37,14 @@ sub new {
 	glutDisplayFunc(sub {}); # $weakself && ++$weakself->{_ready_to_draw} });
 	glutMainLoopEvent();# while (!$self->{_ready_to_draw});
 
-	weaken($instances{$self}= $self);
+	weaken($instances{refaddr $self}= $self);
 	return $self;
 }
 
 sub DESTROY {
 	my $self= shift;
 	glutDestroyWindow(delete $self->{window}) if defined $self->{window};
-	delete $instances{$self};
+	delete $instances{refaddr $self};
 }
 
 END {

@@ -2,7 +2,7 @@ package OpenGL::Sandbox::ContextShim::GLX;
 use strict;
 use warnings;
 use Carp;
-use Scalar::Util 'weaken';
+use Scalar::Util qw/ refaddr weaken /;
 use OpenGL::Sandbox qw/ glGetString GL_VERSION /;
 use X11::GLX::DWIM;
 
@@ -37,8 +37,12 @@ sub new {
 		}});
 	}
 	my $self= bless { glx => $glx }, $class;
-	weaken($instances{$self}= $self);
+	weaken($instances{refaddr $self}= $self);
 	return $self;
+}
+
+sub DESTROY {
+	delete $instances{refaddr $_[0]};
 }
 
 END {
